@@ -1,0 +1,55 @@
+{
+  "transfers": {
+    "gd": { "mod": "googledrive", "cls": "GoogleDriveTransferManager" },
+    "od": { "mod": "onedrive", "cls": "OneDriveTransferManager" },
+    "fs": { "mod": "filesystem", "cls": "FileSystemTransferManager" },
+    "odshare": {
+      "mod": "onedriveshare",
+      "cls": " OneDriveShareTransferManager"
+    }
+  },
+  "configs": {
+    "gd": {
+      "service_account": false,
+      "token_path": "/path/to/token_file.json",
+      "transfer": "gd",
+      "client": {
+        "client_id": "client_id here",
+        "client_secret": "client_secret here"
+      },
+      "proxies": {
+        "http": "proxies here  # would support all proxies that requests support",
+        "https": "proxies here  # would support all proxies that requests support"
+      },
+      "root": "root",
+      "drive_id": ""
+    },
+    "gdtm": {
+      "service_account": true,
+      "token_path": "/path/to/accounts/dir",
+      "transfer": "gd",
+      "proxies": {
+        "http": "proxies here  # would support all proxies that requests support",
+        "https": "proxies here  # would support all proxies that requests support"
+      },
+      "root": "your root dirname here",
+      "drive_id": "your team driveid here"
+    },
+    "od": {
+      "group_drive": false,
+      "token_path": "",
+      "transfer": "od"
+    },
+    "fs": {
+      "transfer": "fs"
+    },
+    "odshare": {
+      "is_folder": true,
+      "transfer": "odshare"
+    },
+    "odsharef": {
+      "is_folder": false,
+      "transfer": "odshare"
+    }
+  }
+}
