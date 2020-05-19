@@ -54,7 +54,7 @@ class FileSystemTokenBackend:
         self._update_tokenfile()
 
     def get_token(self):
-        if self._token_expired:
+        if self._token_expired():
             self._refresh_accesstoken()
         return self.token.get("access_token")
 
