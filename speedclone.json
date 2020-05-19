@@ -36,7 +36,7 @@
       "drive_id": "your team driveid here"
     },
     "od": {
-      "token_path": "",
+      "token_path": "/path/to/token_file.json",
       "transfer": "od"
     },
     "odst": {
