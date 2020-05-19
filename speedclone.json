@@ -36,9 +36,17 @@
       "drive_id": "your team driveid here"
     },
     "od": {
-      "group_drive": false,
       "token_path": "",
       "transfer": "od"
+    },
+    "odst": {
+      "token_path": "/path/to/accounts/dir",
+      "transfer": "od",
+      "drive_id": "your drive id  # default is users default drive (/me/drive)",
+      "client": {
+        "client_id": "your client id",
+        "client_secret": "your client secret  # if your app is not private, then fill nothing"
+      }
     },
     "fs": {
       "transfer": "fs"
