@@ -126,7 +126,7 @@ class OneDriveTransferUploadTask:
     def _handle_request_error(self, request):
         if request.status_code == 429:
             sleep_time = request.headers.get("Retry-After", self.sleep_time)
-            self.client.sleep(sleep_time)
+            self.client.sleep(int(sleep_time))
             raise Exception(
                 "Client Limit Exceeded. Sleep for {}s".format(self.sleep_time)
             )
