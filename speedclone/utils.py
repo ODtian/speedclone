@@ -1,5 +1,6 @@
 import os
 import time
+import functools
 
 
 class DataIter:
@@ -29,6 +30,21 @@ def get_now_time():
 
 
 def iter_path(path):
-    for root, _, files in os.walk(path):
-        for filename in files:
-            yield os.path.join(root, filename)
+    if os.path.isfile(path):
+        yield path
+    else:
+        for root, _, files in os.walk(path):
+            for filename in files:
+                yield os.path.join(root, filename)
+
+
+def with_lock(lock):
+    def _with_lock(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with lock:
+                return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return _with_lock

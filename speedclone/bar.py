@@ -10,6 +10,7 @@ class Bar:
 
     def __init__(self):
         self.step = 0
+        self.bar = None
 
     def init_bar(self, total, desc):
         self.content = desc.ljust(self.max_width, " ")
@@ -22,7 +23,8 @@ class Bar:
         self.bar.update(n)
 
     def close(self):
-        self.bar.close()
+        if self.bar:
+            self.bar.close()
 
     def scroll_text(self):
         if self.step % self.slow == 0:

@@ -53,14 +53,10 @@ class FileSystemTransferManager:
         self.path = path
 
     def _iter_localpaths(self):
-        if os.path.isfile(self.path):
-            name = os.path.basename(self.path)
-            yield self.path, name
-        else:
-            base_path, _ = os.path.split(self.path)
-            for p in iter_path(self.path):
-                relative_path = p[len(base_path) :]
-                yield p, relative_path
+        base_path, _ = os.path.split(self.path)
+        for p in iter_path(self.path):
+            relative_path = p[len(base_path) :]
+            yield p, relative_path
 
     @classmethod
     def get_transfer(cls, conf, path):

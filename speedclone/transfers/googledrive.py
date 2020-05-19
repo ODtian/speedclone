@@ -1,50 +1,60 @@
 import json
 import os
 import time
-from threading import Thread
+from threading import Thread, Lock
 
 import jwt
 import requests
 
 from ..error import TaskExistError, TaskFailError
-from ..utils import iter_path, norm_path, DataIter
+from ..utils import iter_path, norm_path, with_lock, DataIter
+
+
+_google_token_write_lock = Lock()
 
 
 class FileSystemTokenBackend:
     token_url = "https://oauth2.googleapis.com/token"
 
-    def __init__(self, cred, token_path, proxies=None):
+    def __init__(self, token_path, cred, proxies=None):
         self.token_path = token_path
-        self.client_id, self.client_secret = cred.values()
+        self.client = cred
         self.proxies = proxies
+
         if os.path.exists(self.token_path):
             with open(self.token_path, "r") as f:
                 self.token = json.load(f)
         else:
             raise Exception("No token file found.")
 
-    def _refresh_accesstoken(self):
-        refresh_token = self.token.get("refresh_token")
-        data = {
-            "refresh_token": refresh_token,
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "grant_type": "refresh_token",
-        }
-        r = requests.post(self.token_url, data=data, proxies=self.proxies)
-        now_time = int(time.time())
-        self.token.update({**r.json(), **{"get_time": now_time}})
+    def _update_tokenfile(self):
+        with open(self.token_path, "w") as f:
+            json.dump(self.token, f)
 
-    @property
-    def token_expired(self):
+    def _token_expired(self):
         if self.token:
             expired_time = self.token.get("expires_in") + self.token.get("get_time", 0)
             return expired_time <= int(time.time())
         else:
             return True
 
+    @with_lock(_google_token_write_lock)
+    def _refresh_accesstoken(self):
+        now_time = int(time.time())
+        refresh_token = self.token.get("refresh_token")
+
+        data = {"refresh_token": refresh_token, "grant_type": "refresh_token"}
+        data.update(self.client)
+
+        r = requests.post(self.token_url, data=data, proxies=self.proxies)
+        r.raise_for_status()
+
+        self.token = r.json()
+        self.token["get_time"] = now_time
+        self._update_tokenfile()
+
     def get_token(self):
-        if self.token_expired:
+        if self._token_expired:
             self._refresh_accesstoken()
         return self.token.get("access_token")
 
@@ -56,6 +66,7 @@ class FileSystemServiceAccountTokenBackend(FileSystemTokenBackend):
     def __init__(self, cred_path, proxies=None):
         self.cred_path = cred_path
         self.proxies = proxies
+
         self.token = {}
         if os.path.exists(self.cred_path):
             with open(self.cred_path, "r") as f:
@@ -63,6 +74,7 @@ class FileSystemServiceAccountTokenBackend(FileSystemTokenBackend):
         else:
             raise Exception("No cred file found.")
 
+    @with_lock(_google_token_write_lock)
     def _refresh_accesstoken(self):
         now_time = int(time.time())
         token_data = {
@@ -81,16 +93,17 @@ class FileSystemServiceAccountTokenBackend(FileSystemTokenBackend):
             "assertion": auth_jwt,
         }
         r = requests.post(self.token_url, data=data, proxies=self.proxies)
+        r.raise_for_status()
         self.token = r.json()
         self.token["get_time"] = now_time
 
 
-class Google:
+class GoogleDrive:
 
     drive_url = "https://www.googleapis.com/drive/v3/files"
     drive_upload_url = "https://www.googleapis.com/upload/drive/v3/files"
 
-    def __init__(self, token_backend, proxies=None, drive=None):
+    def __init__(self, token_backend, drive=None, proxies=None):
         self.token_backend = token_backend
         self.proxies = proxies
         self.drive = drive
@@ -182,52 +195,51 @@ class GoogleDriveTransferDownloadTask:
 
 class GoogleDriveTransferUploadTask:
     chunk_size = 10 * 1024 ** 2
-    step_size = 100 * 1024
+    step_size = 1024 ** 2
     sleep_time = 10
 
-    def __init__(self, task, bar):
+    def __init__(self, task, bar, client):
         self.task = task
         self.bar = bar
+        self.client = client
 
-    def run(self, client, forlder_id, name):
-        if client.sleeping:
+    def _handle_request_error(self, request):
+        if request.status_code == 429:
+            sleep_time = request.headers.get("Retry-After", self.sleep_time)
+            self.client.sleep(sleep_time)
+            raise Exception(
+                "Client Limit Exceeded. Sleep for {}s".format(self.sleep_time)
+            )
+
+        if request.status_code == 400 and "LimitExceeded" in request.text:
+            self.client.sleep(self.sleep_time)
+            raise Exception(
+                "Client Limit Exceeded. Sleep for {}s".format(self.sleep_time)
+            )
+
+        request.raise_for_status()
+
+    def run(self, forlder_id, name):
+        if self.client.sleeping:
             raise TaskFailError(
                 task=self.task, msg="Client is sleeping, will retry later."
             )
+
         try:
-            request_upload_url = client.get_upload_url(forlder_id, name)
+            upload_url_request = self.client.get_upload_url(forlder_id, name)
         except Exception as e:
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
         else:
-            if request_upload_url is False:
+            if upload_url_request is False:
                 raise TaskExistError(
                     task=self.task,
                     msg="{}: File already exists".format(self.task.get_relative_path()),
                 )
 
         try:
+            self._handle_request_error(upload_url_request)
 
-            if request_upload_url.status_code == 429:
-                sleep_time = request_upload_url.headers.get(
-                    "Retry-After", self.sleep_time
-                )
-                client.sleep(sleep_time)
-                raise Exception(
-                    "Client Limit Exceeded. Sleep for {}s".format(self.sleep_time)
-                )
-
-            if (
-                request_upload_url.status_code == 400
-                and "LimitExceeded" in request_upload_url.text
-            ):
-                client.sleep(self.sleep_time)
-                raise Exception(
-                    "Client Limit Exceeded. Sleep for {}s".format(self.sleep_time)
-                )
-
-            request_upload_url.raise_for_status()
-
-            upload_url = request_upload_url.headers.get("Location")
+            upload_url = upload_url_request.headers.get("Location")
             file_size = self.task.get_total()
 
             self.bar.init_bar(file_size, self.task.get_relative_path())
@@ -247,15 +259,17 @@ class GoogleDriveTransferUploadTask:
                 }
 
                 r = requests.put(
-                    upload_url, data=data, headers=headers, proxies=client.proxies,
+                    upload_url, data=data, headers=headers, proxies=self.client.proxies,
                 )
 
                 if r.status_code not in (200, 201, 308):
-                    self.bar.close()
-                    r.raise_for_status()
+                    self._handle_request_error(r)
+                    raise Exception("Unknown Error: " + str(r))
+
                 self.bar.close()
 
         except Exception as e:
+            self.bar.close()
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
 
 
@@ -300,33 +314,53 @@ class GoogleDriveTransferManager:
 
     @classmethod
     def get_transfer(cls, conf, path):
-
         token_path = conf.get("token_path")
         if os.path.exists(token_path):
             use_service_account = conf.get("service_account", False)
             proxies = conf.get("proxies")
+
             root = conf.get("root")
             drive = conf.get("drive_id")
-            if use_service_account:
-                clients = []
-                for p in iter_path(token_path):
+            cred = conf.get("client")
+
+            clients = []
+
+            for p in iter_path(token_path):
+                if use_service_account:
                     token_backend = FileSystemServiceAccountTokenBackend(
                         cred_path=p, proxies=proxies
                     )
-                    client = Google(
-                        token_backend=token_backend, proxies=proxies, drive=drive
+                else:
+                    token_backend = FileSystemTokenBackend(
+                        cred=cred, token_path=p, proxies=proxies
                     )
-                    clients.append(client)
-                return cls(path=path, clients=clients, root=root)
-            else:
-                cred = conf.get("client")
-                token_backend = FileSystemTokenBackend(
-                    cred=cred, token_path=token_path, proxies=proxies
+                client = GoogleDrive(
+                    token_backend=token_backend, drive=drive, proxies=proxies
                 )
-                client = Google(
-                    token_backend=token_backend, proxies=proxies, drive=drive
-                )
-                return cls(path=path, clients=[client], root=root)
+                clients.append(client)
+
+            return cls(path=path, clients=[client], root=root)
+            # clients.append(client)
+            # if use_service_account:
+            #     clients = []
+            #     for p in iter_path(token_path):
+            #         token_backend = FileSystemServiceAccountTokenBackend(
+            #             cred_path=p, proxies=proxies
+            #         )
+            #         client = GoogleDrive(
+            #             token_backend=token_backend, drive=drive, proxies=proxies
+            #         )
+            #         clients.append(client)
+            #     return cls(path=path, clients=clients, root=root)
+            # else:
+            #     cred = conf.get("client")
+            #     token_backend = FileSystemTokenBackend(
+            #         cred=cred, token_path=token_path, proxies=proxies
+            #     )
+            #     client = GoogleDrive(
+            #         token_backend=token_backend, drive=drive, proxies=proxies
+            #     )
+            #     return cls(path=path, clients=[client], root=root)
         else:
             raise Exception("Token path not exists")
 
@@ -342,8 +376,8 @@ class GoogleDriveTransferManager:
             dir_id = self._get_dir_id(client, dir_path)
 
             def worker(bar):
-                w = GoogleDriveTransferUploadTask(task, bar)
-                w.run(client, dir_id, name)
+                w = GoogleDriveTransferUploadTask(task, bar, client)
+                w.run(dir_id, name)
 
             return worker
         except Exception as e:
