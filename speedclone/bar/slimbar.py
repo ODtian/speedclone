@@ -61,7 +61,22 @@ class SlimBarManager(BaseBarManager):
     def done(self, result):
         self.count_bar.update(1)
 
+    def sleep(self, e):
+        super().sleep(e)
+        self.byte_bar.update(e.task.get_total())
+        self.count_bar.update(1)
+
+    def error(self, e):
+        super().error(e)
+        self.byte_bar.update(e.task.get_total())
+        self.count_bar.update(1)
+
     def exists(self, e):
         super().exists(e)
+        self.byte_bar.update(e.task.get_total())
+        self.count_bar.update(1)
+
+    def fail(self, e):
+        super().fail(e)
         self.byte_bar.update(e.task.get_total())
         self.count_bar.update(1)
