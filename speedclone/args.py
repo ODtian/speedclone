@@ -14,11 +14,12 @@ def parse_args():
     parser.add_argument("--chunk-size", default=30 * (1024 ** 2), type=int)
     parser.add_argument("--step-size", default=1024 ** 2, type=int)
     parser.add_argument("--bar", default="common", type=str)
-    parser.add_argument("--conf", default="./speedclone.json", type=str)
+    parser.add_argument(
+        "--conf", default=os.path.join(BASE_DIR, "..", "speedclone.json"), type=str
+    )
 
     args, rest = parser.parse_known_args()
 
-    args.conf = os.path.join(BASE_DIR, "..", args.conf)
     if os.path.exists(args.conf):
         conf_json = json.load(open(args.conf, "r"))
         config = conf_json.get("configs")
