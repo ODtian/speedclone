@@ -1,14 +1,14 @@
 import json
 import os
+import random
 import time
-from threading import Thread, Lock
+from threading import Lock, Thread
 
 import jwt
 import requests
 
 from ..error import TaskExistError, TaskFailError
-from ..utils import iter_path, norm_path, with_lock, DataIter
-
+from ..utils import DataIter, iter_path, norm_path, with_lock
 
 _google_token_write_lock = Lock()
 
@@ -338,7 +338,7 @@ class GoogleDriveTransferManager:
                     token_backend=token_backend, drive=drive, proxies=proxies
                 )
                 clients.append(client)
-
+            random.shuffle(clients)
             return cls(path=path, clients=clients, root=root)
         else:
             raise Exception("Token path not exists")

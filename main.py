@@ -1,10 +1,10 @@
 import importlib
 
 from speedclone.args import parse_args
-from speedclone.bar import BarManager
 from speedclone.manager import TransferManager
 
-BASE_IMPORT_PATH = "speedclone.transfers."
+TRANSFERS_BASE_IMPORT_PATH = "speedclone.transfers."
+BARS_BASE_IMPORT_PATH = "speedclone.bar."
 
 
 def handle_rest(s):
@@ -13,7 +13,7 @@ def handle_rest(s):
 
 
 def main():
-    args, rest, config, transfers = parse_args()
+    args, rest, config, transfers, bars = parse_args()
 
     f, t = rest
     f_name, f_path = handle_rest(f)
@@ -26,16 +26,20 @@ def main():
     t_trans = transfers.get(t_conf.get("transfer"))
 
     from_transfer = getattr(
-        importlib.import_module(BASE_IMPORT_PATH + f_trans.get("mod")),
+        importlib.import_module(TRANSFERS_BASE_IMPORT_PATH + f_trans.get("mod")),
         f_trans.get("cls"),
     ).get_transfer(f_conf, f_path)
 
     to_transfer = getattr(
-        importlib.import_module(BASE_IMPORT_PATH + t_trans.get("mod")),
+        importlib.import_module(TRANSFERS_BASE_IMPORT_PATH + t_trans.get("mod")),
         t_trans.get("cls"),
     ).get_transfer(t_conf, t_path)
 
-    bar_manager = BarManager()
+    bar = bars.get(args.bar)
+    bar_manager = getattr(
+        importlib.import_module(BARS_BASE_IMPORT_PATH + bar.get("mod")), bar.get("cls"),
+    ).get_bar_manager()
+
     transfer_manager = TransferManager(
         download_manager=from_transfer,
         upload_manager=to_transfer,

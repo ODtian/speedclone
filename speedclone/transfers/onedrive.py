@@ -1,13 +1,14 @@
 import json
 import os
+import random
 import time
-from threading import Thread, Lock
+from threading import Lock, Thread
+from urllib.parse import quote
 
 import requests
 
 from ..error import TaskExistError, TaskFailError
-from ..utils import iter_path, norm_path, with_lock, DataIter
-from urllib.parse import quote
+from ..utils import DataIter, iter_path, norm_path, with_lock
 
 _onedrive_token_write_lock = Lock()
 
@@ -179,7 +180,6 @@ class OneDriveTransferUploadTask:
                     raise Exception("Unknown Error: " + str(r))
 
                 self.bar.close()
-
         except Exception as e:
             self.bar.close()
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
@@ -213,6 +213,7 @@ class OneDriveTransferManager:
                 client = Onedrive(token_backend=token_backend, drive=drive)
                 clients.append(client)
 
+            random.shuffle(clients)
             return cls(path=path, clients=clients)
         else:
             raise Exception("Token path not exists")

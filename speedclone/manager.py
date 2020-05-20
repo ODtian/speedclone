@@ -35,6 +35,9 @@ class TransferManager:
         self.task_queue.put(e.task)
         self.bar_manager.fail(e)
 
+    def handle_done(self, result):
+        self.bar_manager.done(result)
+
     def run_task_pusher(self):
         def pusher():
             for task in self.download_manager.iter_tasks():
@@ -57,7 +60,7 @@ class TransferManager:
 
     def done_callback(self, task):
         try:
-            task.result()
+            result = task.result()
         except TaskExistError as e:
             self.handle_exists(e)
         except TaskSleepError as e:
@@ -66,6 +69,8 @@ class TransferManager:
             self.handle_fail(e)
         except Exception as e:
             self.handle_error(e)
+        else:
+            self.handle_done(result)
         finally:
             self.task_queue.task_done()
 
@@ -79,7 +84,7 @@ class TransferManager:
 
     def get_worker(self, task):
         _worker = self.upload_manager.get_worker(task)
-        bar = self.bar_manager.get_bar()
+        bar = self.bar_manager.get_bar(task)
 
         def worker():
             self.sleep_queue.join()

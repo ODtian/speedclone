@@ -8,6 +8,10 @@
       "cls": " OneDriveShareTransferManager"
     }
   },
+  "bar": {
+    "slim": { "mod": "slimbar", "cls": "SlimBarManager" },
+    "common": { "mod": "commonbar", "cls": "CommonBarManager" }
+  },
   "configs": {
     "gd": {
       "service_account": false,

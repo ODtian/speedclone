@@ -38,11 +38,14 @@ class FileSystemTransferUploadTask:
             base_dir = os.path.dirname(total_path)
             if not os.path.exists(base_dir):
                 os.makedirs(base_dir)
-            self.bar.init_bar()
+
+            self.bar.init_bar(self.task.get_total(), self.task.get_relative_path())
+
             with open(total_path, "wb") as f:
                 for data in self.task.iter_data(chunk_size=self.chunk_size):
                     f.write(data)
                     self.bar.update(len(data))
+
             self.bar.close()
         except Exception as e:
             raise TaskFailError(task=self.task, msg=str(e), code=type(e))
