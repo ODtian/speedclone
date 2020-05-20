@@ -63,4 +63,5 @@ class SlimBarManager(BaseBarManager):
 
     def exists(self, e):
         super().exists(e)
+        self.byte_bar.update(e.task.get_total())
         self.count_bar.update(1)
