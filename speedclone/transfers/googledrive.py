@@ -74,7 +74,6 @@ class FileSystemServiceAccountTokenBackend(FileSystemTokenBackend):
         else:
             raise Exception("No cred file found.")
 
-    @with_lock(_google_token_write_lock)
     def _refresh_accesstoken(self):
         now_time = int(time.time())
         token_data = {
