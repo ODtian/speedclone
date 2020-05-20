@@ -38,6 +38,7 @@ class FileSystemTokenBackend:
         else:
             return True
 
+    @with_lock(_onedrive_token_write_lock)
     def _refresh_accesstoken(self):
         now_time = int(time.time())
 
@@ -58,7 +59,6 @@ class FileSystemTokenBackend:
         self.token["get_time"] = now_time
         self._update_tokenfile()
 
-    @with_lock(_onedrive_token_write_lock)
     def get_token(self):
         if self._token_expired():
             self._refresh_accesstoken()
