@@ -339,28 +339,7 @@ class GoogleDriveTransferManager:
                 )
                 clients.append(client)
 
-            return cls(path=path, clients=[client], root=root)
-            # clients.append(client)
-            # if use_service_account:
-            #     clients = []
-            #     for p in iter_path(token_path):
-            #         token_backend = FileSystemServiceAccountTokenBackend(
-            #             cred_path=p, proxies=proxies
-            #         )
-            #         client = GoogleDrive(
-            #             token_backend=token_backend, drive=drive, proxies=proxies
-            #         )
-            #         clients.append(client)
-            #     return cls(path=path, clients=clients, root=root)
-            # else:
-            #     cred = conf.get("client")
-            #     token_backend = FileSystemTokenBackend(
-            #         cred=cred, token_path=token_path, proxies=proxies
-            #     )
-            #     client = GoogleDrive(
-            #         token_backend=token_backend, drive=drive, proxies=proxies
-            #     )
-            #     return cls(path=path, clients=[client], root=root)
+            return cls(path=path, clients=clients, root=root)
         else:
             raise Exception("Token path not exists")
 
