@@ -9,7 +9,7 @@ def parse_args():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-S", "--sleep-time", default=0.1, type=int)
+    parser.add_argument("-S", "--sleep-time", default=0, type=int)
     parser.add_argument("-W", "--workers", default=5, type=int)
     parser.add_argument("--chunk-size", default=30 * (1024 ** 2), type=int)
     parser.add_argument("--step-size", default=1024 ** 2, type=int)
