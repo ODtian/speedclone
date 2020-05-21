@@ -62,7 +62,7 @@ class FileSystemTransferManager:
             yield p, relative_path
 
     @classmethod
-    def get_transfer(cls, conf, path):
+    def get_transfer(cls, conf, path, args):
         return cls(path=path)
 
     def iter_tasks(self):
