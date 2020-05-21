@@ -65,8 +65,10 @@ class FileSystemTokenBackend:
         return self.token.get("access_token")
 
 
-class Onedrive:
+class OneDrive:
+
     api_url = "https://graph.microsoft.com/v1.0"
+    sleep_time = 10
 
     def __init__(self, token_backend, proxies=None, drive=None):
         self.token_backend = token_backend
@@ -97,7 +99,9 @@ class Onedrive:
             return False
         return r
 
-    def sleep(self, seconds):
+    def sleep(self, seconds=None):
+        if not seconds:
+            seconds = self.sleep_time
         if not self.sleeping:
 
             def sleep():
@@ -107,6 +111,7 @@ class Onedrive:
 
             t = Thread(target=sleep)
             t.start()
+        return seconds
 
 
 class OneDriveTransferDownloadTask:
@@ -117,7 +122,6 @@ class OneDriveTransferDownloadTask:
 class OneDriveTransferUploadTask:
     chunk_size = 10 * 1024 ** 2
     step_size = 1024 ** 2
-    sleep_time = 10
 
     def __init__(self, task, bar, client):
         self.task = task
@@ -126,11 +130,9 @@ class OneDriveTransferUploadTask:
 
     def _handle_request_error(self, request):
         if request.status_code == 429:
-            sleep_time = request.headers.get("Retry-After", self.sleep_time)
-            self.client.sleep(int(sleep_time))
-            raise Exception(
-                "Client Limit Exceeded. Sleep for {}s".format(self.sleep_time)
-            )
+            sleep_time = request.headers.get("Retry-After")
+            seconds = self.client.sleep(sleep_time)
+            raise Exception("Client Limit Exceeded. Sleep for {}s".format(seconds))
 
         request.raise_for_status()
 
@@ -186,6 +188,7 @@ class OneDriveTransferUploadTask:
 
 
 class OneDriveTransferManager:
+
     def __init__(self, path, clients):
         self.path = path
         self.clients = clients
@@ -200,7 +203,12 @@ class OneDriveTransferManager:
                 return _client
 
     @classmethod
-    def get_transfer(cls, conf, path):
+    def get_transfer(cls, conf, path, args):
+
+        OneDriveTransferUploadTask.chunk_size = args.chunk_size
+        OneDriveTransferUploadTask.step_size = args.step_size
+        OneDrive.sleep_time = args.client_sleep
+
         token_path = conf.get("token_path")
         if os.path.exists(token_path):
             drive = conf.get("drive_id")
@@ -210,7 +218,7 @@ class OneDriveTransferManager:
 
             for p in iter_path(token_path):
                 token_backend = FileSystemTokenBackend(cred=cred, token_path=p)
-                client = Onedrive(token_backend=token_backend, drive=drive)
+                client = OneDrive(token_backend=token_backend, drive=drive)
                 clients.append(client)
 
             random.shuffle(clients)

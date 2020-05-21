@@ -8,15 +8,14 @@ from .error import TaskExistError, TaskFailError, TaskSleepError
 
 
 class TransferManager:
-    task_queue = JoinableQueue()
-    sleep_queue = JoinableQueue()
-
     def __init__(self, download_manager, upload_manager, bar_manager, sleep_time):
         self.download_manager = download_manager
         self.upload_manager = upload_manager
         self.bar_manager = bar_manager
         self.sleep_time = sleep_time
         self.pusher_finished = False
+        self.task_queue = JoinableQueue()
+        self.sleep_queue = JoinableQueue()
 
     def handle_sleep(self, e):
         self.task_queue.put(e.task)

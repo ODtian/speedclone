@@ -102,6 +102,7 @@ class GoogleDrive:
 
     drive_url = "https://www.googleapis.com/drive/v3/files"
     drive_upload_url = "https://www.googleapis.com/upload/drive/v3/files"
+    sleep_time = 10
 
     def __init__(self, token_backend, drive=None, proxies=None):
         self.token_backend = token_backend
@@ -176,7 +177,9 @@ class GoogleDrive:
         )
         return r
 
-    def sleep(self, seconds):
+    def sleep(self, seconds=None):
+        if not seconds:
+            seconds = self.sleep_time
         if not self.sleeping:
 
             def sleep():
@@ -186,6 +189,7 @@ class GoogleDrive:
 
             t = Thread(target=sleep)
             t.start()
+        return seconds
 
 
 class GoogleDriveTransferDownloadTask:
@@ -196,7 +200,6 @@ class GoogleDriveTransferDownloadTask:
 class GoogleDriveTransferUploadTask:
     chunk_size = 10 * 1024 ** 2
     step_size = 1024 ** 2
-    sleep_time = 10
 
     def __init__(self, task, bar, client):
         self.task = task
@@ -205,17 +208,13 @@ class GoogleDriveTransferUploadTask:
 
     def _handle_request_error(self, request):
         if request.status_code == 429:
-            sleep_time = request.headers.get("Retry-After", self.sleep_time)
-            self.client.sleep(sleep_time)
-            raise Exception(
-                "Client Limit Exceeded. Sleep for {}s".format(self.sleep_time)
-            )
+            sleep_time = request.headers.get("Retry-After")
+            seconds = self.client.sleep(sleep_time)
+            raise Exception("Client Limit Exceeded. Sleep for {}s".format(seconds))
 
         if request.status_code == 400 and "LimitExceeded" in request.text:
-            self.client.sleep(self.sleep_time)
-            raise Exception(
-                "Client Limit Exceeded. Sleep for {}s".format(self.sleep_time)
-            )
+            seconds = self.client.sleep()
+            raise Exception("Client Limit Exceeded. Sleep for {}s".format(seconds))
 
         request.raise_for_status()
 
@@ -313,7 +312,12 @@ class GoogleDriveTransferManager:
         return self.path_dict[p]
 
     @classmethod
-    def get_transfer(cls, conf, path):
+    def get_transfer(cls, conf, path, args):
+
+        GoogleDriveTransferUploadTask.chunk_size = args.chunk_size
+        GoogleDriveTransferUploadTask.step_size = args.step_size
+        GoogleDrive.sleep_time = args.client_sleep
+
         token_path = conf.get("token_path")
         if os.path.exists(token_path):
             use_service_account = conf.get("service_account", False)
@@ -355,7 +359,7 @@ class GoogleDriveTransferManager:
             dir_id = self._get_dir_id(client, dir_path)
 
             def worker(bar):
-                w = GoogleDriveTransferUploadTask(task, bar, client)
+                w = GoogleDriveTransferUploadTask(task, bar, client,)
                 w.run(dir_id, name)
 
             return worker

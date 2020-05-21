@@ -28,12 +28,12 @@ def main():
     from_transfer = getattr(
         importlib.import_module(TRANSFERS_BASE_IMPORT_PATH + f_trans.get("mod")),
         f_trans.get("cls"),
-    ).get_transfer(f_conf, f_path)
+    ).get_transfer(f_conf, f_path, args)
 
     to_transfer = getattr(
         importlib.import_module(TRANSFERS_BASE_IMPORT_PATH + t_trans.get("mod")),
         t_trans.get("cls"),
-    ).get_transfer(t_conf, t_path)
+    ).get_transfer(t_conf, t_path, args)
 
     bar = bars.get(args.bar)
     bar_manager = getattr(
@@ -44,7 +44,7 @@ def main():
         download_manager=from_transfer,
         upload_manager=to_transfer,
         bar_manager=bar_manager,
-        sleep_time=args.sleep_time,
+        sleep_time=args.interval,
     )
     transfer_manager.run(max_workers=args.workers)
 
