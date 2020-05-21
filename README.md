@@ -81,17 +81,17 @@ optional arguments:
 ```json
 {
   "transfers": {
-  	///
+  	//
   },
   "bar": {
-  	///
+  	//
   },
   "configs": {
   	"config_name":{
-  	/// config1
+  	// config1
   	},
   	"config_name":{
-  	/// config2
+  	// config2
   	}
 }
 ```
@@ -99,11 +99,11 @@ optional arguments:
 ###### Google Drive：
 ```json
 {
-	"service_account": false,  // 是否使用sa（service account），必选。
-	"token_path": "/path/to/token_file.json",  // 你的凭证文件，如果 service_account 为是，则指定为下载下来的凭证文件路径，或文件夹；
+	"service_account": false, // 是否使用sa（service account），必选。
+	"token_path": "/path/to/token_file.json", // 你的凭证文件，如果 service_account 为是，则指定为下载下来的凭证文件路径，或文件夹；
 												  若否，则将验证后的json信息（详见下方）保存为文件，并指定为文件路径或文件夹。
-	"transfer": "gd",  // 传输方式，此处为gd
-	"client": {        // oauth2凭证信息，如果 service_account 为是则不需要。
+	"transfer": "gd", // 传输方式，此处为gd
+	"client": {       // oauth2凭证信息，如果 service_account 为是则不需要。
 	  "client_id": "client_id here",
 	  "client_secret": "client_secret here"
 	},
