@@ -1,6 +1,11 @@
+import functools
 import os
 import time
-import functools
+
+from colorama import Fore, init
+from tqdm.autonotebook import tqdm
+
+init()
 
 
 class DataIter:
@@ -48,3 +53,33 @@ def with_lock(lock):
         return wrapper
 
     return _with_lock
+
+
+def console_write(mode, message):
+    if mode == "sleep":
+        tqdm.write(
+            "{color}[{message}]{reset}".format(
+                color=Fore.BLUE, message=message, reset=Fore.RESET,
+            )
+        )
+
+    elif mode == "error":
+        tqdm.write(
+            "{color}[{message}]{reset}".format(
+                color=Fore.RED, message=message, reset=Fore.RESET
+            )
+        )
+
+    elif mode == "exists":
+        tqdm.write(
+            "{color}[{message}]{reset}".format(
+                color=Fore.YELLOW, message=message, reset=Fore.RESET
+            )
+        )
+
+    elif mode == "fail":
+        tqdm.write(
+            "{color}[{message}]{reset}".format(
+                color=Fore.RED, message=message, reset=Fore.RESET
+            )
+        )

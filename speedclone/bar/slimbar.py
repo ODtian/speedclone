@@ -41,7 +41,7 @@ class CountBar:
         self.bar.update(n)
 
     def close(self):
-        pass
+        self.update(1)
 
     def _create_bar(self, total):
         bar = tqdm(total=total, position=2, unit="tasks")
@@ -57,9 +57,6 @@ class SlimBarManager(BaseBarManager):
         self.byte_bar.update_total(task.get_total())
         self.count_bar.update_total(1)
         return self.byte_bar
-
-    def done(self, result):
-        self.count_bar.update(1)
 
     def sleep(self, e):
         super().sleep(e)

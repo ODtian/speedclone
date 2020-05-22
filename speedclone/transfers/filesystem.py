@@ -26,6 +26,7 @@ class FileSystemTransferDownloadTask:
 
 class FileSystemTransferUploadTask:
     chunk_size = 10 * 1024 ** 2
+    step_size = 1024 ** 2
 
     def __init__(self, task, bar):
         self.task = task
@@ -33,7 +34,7 @@ class FileSystemTransferUploadTask:
 
     def run(self, total_path):
         if os.path.exists(total_path):
-            raise TaskExistError
+            raise TaskExistError(task=self.task)
         try:
             base_dir = os.path.dirname(total_path)
             if not os.path.exists(base_dir):
@@ -43,8 +44,11 @@ class FileSystemTransferUploadTask:
 
             with open(total_path, "wb") as f:
                 for data in self.task.iter_data(chunk_size=self.chunk_size):
-                    f.write(data)
-                    self.bar.update(len(data))
+                    while data:
+                        step = data[: self.step_size]
+                        f.write(step)
+                        data = data[self.step_size :]
+                        self.bar.update(len(step))
 
             self.bar.close()
         except Exception as e:
@@ -63,6 +67,8 @@ class FileSystemTransferManager:
 
     @classmethod
     def get_transfer(cls, conf, path, args):
+        FileSystemTransferUploadTask.chunk_size = args.chunk_size
+        FileSystemTransferUploadTask.step_size = args.step_size
         return cls(path=path)
 
     def iter_tasks(self):

@@ -148,10 +148,7 @@ class OneDriveTransferUploadTask:
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
         else:
             if upload_url_request is False:
-                raise TaskExistError(
-                    task=self.task,
-                    msg="{}: File already exists".format(self.task.get_relative_path()),
-                )
+                raise TaskExistError(task=self.task)
 
         try:
             self._handle_request_error(upload_url_request)
@@ -181,14 +178,13 @@ class OneDriveTransferUploadTask:
                     self._handle_request_error(r)
                     raise Exception("Unknown Error: " + str(r))
 
-                self.bar.close()
         except Exception as e:
-            self.bar.close()
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
+        finally:
+            self.bar.close()
 
 
 class OneDriveTransferManager:
-
     def __init__(self, path, clients):
         self.path = path
         self.clients = clients

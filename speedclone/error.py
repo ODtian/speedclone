@@ -5,24 +5,33 @@ class TaskException(Exception):
         self.code = code
 
 
+class IterTaskException():
+    def __init__(self, msg):
+        self.msg = msg
+
+
 class TaskSleepError(TaskException):
     def __init__(
-        self, sleep_time, *args, **kwargs,
+        self, sleep_time, **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
         self.sleep_time = sleep_time
 
 
 class TaskFailError(TaskException):
     def __init__(
-        self, exce=None, *args, **kwargs,
+        self, exce=None, **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
         self.exce = exce
 
 
 class TaskExistError(TaskException):
     def __init__(
-        self, *args, **kwargs,
+        self, **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        if "msg" not in kwargs.keys():
+            t = kwargs.get("task")
+            msg = "{}: File already exists".format(t.get_relative_path())
+            kwargs["msg"] = msg
+        super().__init__(**kwargs)

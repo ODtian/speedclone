@@ -4,7 +4,9 @@ from multiprocessing import JoinableQueue
 from queue import Empty
 from threading import Thread
 
-from .error import TaskExistError, TaskFailError, TaskSleepError
+from .error import (IterTaskException, TaskExistError, TaskFailError,
+                    TaskSleepError)
+from .utils import console_write
 
 
 class TransferManager:
@@ -34,13 +36,13 @@ class TransferManager:
         self.task_queue.put(e.task)
         self.bar_manager.fail(e)
 
-    def handle_done(self, result):
-        self.bar_manager.done(result)
-
     def run_task_pusher(self):
         def pusher():
             for task in self.download_manager.iter_tasks():
-                self.task_queue.put(task)
+                if isinstance(task, IterTaskException):
+                    console_write(mode="error", message=task.msg)
+                else:
+                    self.task_queue.put(task)
             self.pusher_finished = True
 
         pusher_thread = Thread(target=pusher)
@@ -59,7 +61,7 @@ class TransferManager:
 
     def done_callback(self, task):
         try:
-            result = task.result()
+            task.result()
         except TaskExistError as e:
             self.handle_exists(e)
         except TaskSleepError as e:
@@ -68,8 +70,6 @@ class TransferManager:
             self.handle_fail(e)
         except Exception as e:
             self.handle_error(e)
-        else:
-            self.handle_done(result)
         finally:
             self.task_queue.task_done()
 

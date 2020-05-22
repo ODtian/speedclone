@@ -8,18 +8,18 @@ import jwt
 import requests
 
 from ..error import TaskExistError, TaskFailError
-from ..utils import DataIter, iter_path, norm_path, with_lock
+from ..utils import DataIter, iter_path, norm_path, with_lock, console_write
 
 _google_token_write_lock = Lock()
 
 
 class FileSystemTokenBackend:
     token_url = "https://oauth2.googleapis.com/token"
+    http = {}
 
-    def __init__(self, token_path, cred, proxies=None):
+    def __init__(self, token_path, cred):
         self.token_path = token_path
         self.client = cred
-        self.proxies = proxies
 
         if os.path.exists(self.token_path):
             with open(self.token_path, "r") as f:
@@ -46,7 +46,7 @@ class FileSystemTokenBackend:
         data = {"refresh_token": refresh_token, "grant_type": "refresh_token"}
         data.update(self.client)
 
-        r = requests.post(self.token_url, data=data, proxies=self.proxies)
+        r = requests.post(self.token_url, data=data, **self.http)
         r.raise_for_status()
 
         self.token = r.json()
@@ -63,11 +63,10 @@ class FileSystemServiceAccountTokenBackend(FileSystemTokenBackend):
     scope = "https://www.googleapis.com/auth/drive"
     expires_in = 3600
 
-    def __init__(self, cred_path, proxies=None):
+    def __init__(self, cred_path):
         self.cred_path = cred_path
-        self.proxies = proxies
-
         self.token = {}
+
         if os.path.exists(self.cred_path):
             with open(self.cred_path, "r") as f:
                 self.config = json.load(f)
@@ -92,7 +91,7 @@ class FileSystemServiceAccountTokenBackend(FileSystemTokenBackend):
             "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
             "assertion": auth_jwt,
         }
-        r = requests.post(self.token_url, data=data, proxies=self.proxies)
+        r = requests.post(self.token_url, data=data, **self.http)
         r.raise_for_status()
         self.token = r.json()
         self.token["get_time"] = now_time
@@ -103,10 +102,10 @@ class GoogleDrive:
     drive_url = "https://www.googleapis.com/drive/v3/files"
     drive_upload_url = "https://www.googleapis.com/upload/drive/v3/files"
     sleep_time = 10
+    http = {}
 
-    def __init__(self, token_backend, drive=None, proxies=None):
+    def __init__(self, token_backend, drive=None):
         self.token_backend = token_backend
-        self.proxies = proxies
         self.drive = drive
         self.sleeping = False
 
@@ -115,35 +114,11 @@ class GoogleDrive:
             "Authorization": "Bearer {}".format(self.token_backend.get_token()),
             "Content-Type": content_type,
         }
+        headers.update(self.http.get("headers", {}))
         return headers
 
-    def create_file_by_name(
-        self, parent_id, name, mime="application/vnd.google-apps.folder"
-    ):
-        params = {"supportsAllDrives": "true"}
-        data = {"name": name, "parents": [parent_id], "mimeType": mime}
-        headers = self.get_headers()
-        r = requests.post(
-            self.drive_url,
-            headers=headers,
-            params=params,
-            json=data,
-            proxies=self.proxies,
-        )
-        return r
-
-    def get_files_by_name(self, parent_id, name, mime="folder"):
-        params = {
-            "q": "'{parent_id}' in parents and "
-            "name = '{name}' and "
-            "mimeType {mime} 'application/vnd.google-apps.folder' and "
-            "trashed = false".format(
-                parent_id=parent_id,
-                mime=("=" if mime == "folder" else "!="),
-                name=name.replace("'", r"\'"),
-            ),
-            "supportsAllDrives": "true",
-        }
+    def get_params(self, params={}):
+        params.update({"supportsAllDrives": "true"})
         if self.drive:
             params.update(
                 {
@@ -152,10 +127,42 @@ class GoogleDrive:
                     "driveId": self.drive,
                 }
             )
+        return params
+
+    def create_file_by_name(
+        self, parent_id, name, mime="application/vnd.google-apps.folder"
+    ):
+        params = {"supportsAllDrives": "true"}
+        data = {"name": name, "parents": [parent_id], "mimeType": mime}
+        headers = self.get_headers()
+        r = requests.post(
+            self.drive_url, headers=headers, params=params, json=data, **self.http
+        )
+        return r
+
+    def get_files_by_p(self, params):
         headers = self.get_headers()
         r = requests.get(
-            self.drive_url, headers=headers, params=params, proxies=self.proxies
+            self.drive_url, headers=headers, params=self.get_params(params), **self.http
         )
+        return r
+
+    def get_files_by_name(self, parent_id, name=None, mime="folder"):
+        p = {
+            "q": " and ".join(
+                [
+                    "'{parent_id}' in parents",
+                    "name = '{name}'",
+                    "mimeType {mime} 'application/vnd.google-apps.folder'",
+                    "trashed = false",
+                ]
+            ).format(
+                parent_id=parent_id,
+                name=name.replace("'", r"\'"),
+                mime=("=" if mime == "folder" else "!="),
+            )
+        }
+        r = self.get_files_by_p(p)
         return r
 
     def get_upload_url(self, parent_id, name):
@@ -173,7 +180,34 @@ class GoogleDrive:
             headers=headers,
             json=data,
             params=params,
-            proxies=self.proxies,
+            **self.http
+        )
+        return r
+
+    def get_download_url(self, file_id):
+        params = {"fields": "size, webContentLink", "supportsAllDrives": "true"}
+        headers = self.get_headers()
+        r = requests.get(
+            self.drive_url + "/" + file_id, headers=headers, params=params, **self.http
+        )
+        return r
+
+    def copy_to(self, source_id, dest_id, name):
+        exist_file = (
+            self.get_files_by_name(dest_id, name, mime="file").json().get("files", [])
+        )
+        if exist_file:
+            return False
+
+        params = {"supportsAllDrives": "true"}
+        data = {"name": name, "parents": [dest_id]}
+        headers = self.get_headers()
+        r = requests.post(
+            self.drive_url + "/" + source_id + "/copy",
+            headers=headers,
+            json=data,
+            params=params,
+            **self.http
         )
         return r
 
@@ -193,13 +227,35 @@ class GoogleDrive:
 
 
 class GoogleDriveTransferDownloadTask:
-    # TODO
-    pass
+    http = {}
+
+    def __init__(self, file_id, relative_path, client):
+        self.file_id = file_id
+        self.relative_path = relative_path
+        self.client = client
+        self._info = None
+
+    def iter_data(self, chunk_size=(10 * 1024 ** 2), copy=False):
+        if copy:
+            yield self.file_id
+        else:
+            download_url = self._info["webContentLink"]
+            with requests.get(download_url, stream=True, **self.http) as r:
+                yield from r.iter_content(chunk_size=chunk_size)
+
+    def get_relative_path(self):
+        return self.relative_path
+
+    def get_total(self):
+        with self.client.get_download_url(self.file_id) as r:
+            self._info = r.json()
+            return self._info["size"]
 
 
 class GoogleDriveTransferUploadTask:
     chunk_size = 10 * 1024 ** 2
     step_size = 1024 ** 2
+    http = {}
 
     def __init__(self, task, bar, client):
         self.task = task
@@ -218,6 +274,32 @@ class GoogleDriveTransferUploadTask:
 
         request.raise_for_status()
 
+    def _do_copy(self, folder_id, name):
+        if self.client.sleeping:
+            raise TaskFailError(
+                task=self.task, msg="Client is sleeping, will retry later."
+            )
+        file_size = self.task.get_total()
+        try:
+            for file_id in self.task.iter_data(copy=True):
+                result = self.client.copy_to(file_id, folder_id, name)
+                self._handle_request_error(result)
+
+        except TypeError:
+            console_write(
+                mode="error",
+                message="Copy mode only support Google Drive, please check your config.",
+            )
+            result = None
+        except Exception as e:
+            raise TaskFailError(exce=e, task=self.task, msg=str(e))
+        else:
+            if result is False:
+                raise TaskExistError(task=self.task)
+        finally:
+            self.bar.update(file_size)
+            self.bar.close()
+
     def run(self, forlder_id, name):
         if self.client.sleeping:
             raise TaskFailError(
@@ -230,10 +312,7 @@ class GoogleDriveTransferUploadTask:
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
         else:
             if upload_url_request is False:
-                raise TaskExistError(
-                    task=self.task,
-                    msg="{}: File already exists".format(self.task.get_relative_path()),
-                )
+                raise TaskExistError(task=self.task)
 
         try:
             self._handle_request_error(upload_url_request)
@@ -258,18 +337,17 @@ class GoogleDriveTransferUploadTask:
                 }
 
                 r = requests.put(
-                    upload_url, data=data, headers=headers, proxies=self.client.proxies,
+                    upload_url, data=data, headers=headers, **self.client.http
                 )
 
                 if r.status_code not in (200, 201, 308):
                     self._handle_request_error(r)
                     raise Exception("Unknown Error: " + str(r))
 
-                self.bar.close()
-
         except Exception as e:
-            self.bar.close()
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
+        finally:
+            self.bar.close()
 
 
 class GoogleDriveTransferManager:
@@ -311,6 +389,44 @@ class GoogleDriveTransferManager:
                 self.path_dict[p] = folder_id
         return self.path_dict[p]
 
+    def _list_dirs(self, path, page_token=None):
+        try:
+            client = self._get_client()
+            if page_token:
+                p = {"pageToken": page_token}
+            else:
+                dir_id = self._get_dir_id(client, path)
+                p = {
+                    "q": " and ".join(
+                        ["'{parent_id}' in parents", "trashed = false"]
+                    ).format(parent_id=dir_id)
+                }
+
+            r = client.get_files_by_p(p)
+            result = r.json()
+
+            folders = []
+
+            for file in result.get("files", []):
+                relative_path = norm_path(path, file["name"])
+                if file["mimeType"] == "application/vnd.google-apps.folder":
+                    folders.append(relative_path)
+                else:
+                    file_id = file["id"]
+                    yield file_id, relative_path
+
+            next_token = result.get("nextPageToken")
+
+            if next_token:
+                yield from self._list_dirs(path, next_token)
+
+            for folder_path in folders:
+                yield from self._list_dirs(folder_path)
+
+        except Exception as e:
+            console_write(mode="error", message="{}: {}".format(folder_path, str(e)))
+            yield from self._list_dirs(path)
+
     @classmethod
     def get_transfer(cls, conf, path, args):
 
@@ -318,10 +434,16 @@ class GoogleDriveTransferManager:
         GoogleDriveTransferUploadTask.step_size = args.step_size
         GoogleDrive.sleep_time = args.client_sleep
 
+        if args.copy:
+            GoogleDriveTransferUploadTask.run = GoogleDriveTransferUploadTask._do_copy
+
+        GoogleDrive.http = conf.get("http", {})
+        FileSystemTokenBackend.http = conf.get("http", {})
+
         token_path = conf.get("token_path")
+
         if os.path.exists(token_path):
             use_service_account = conf.get("service_account", False)
-            proxies = conf.get("proxies")
 
             root = conf.get("root")
             drive = conf.get("drive_id")
@@ -331,24 +453,22 @@ class GoogleDriveTransferManager:
 
             for p in iter_path(token_path):
                 if use_service_account:
-                    token_backend = FileSystemServiceAccountTokenBackend(
-                        cred_path=p, proxies=proxies
-                    )
+                    token_backend = FileSystemServiceAccountTokenBackend(cred_path=p)
                 else:
-                    token_backend = FileSystemTokenBackend(
-                        cred=cred, token_path=p, proxies=proxies
-                    )
-                client = GoogleDrive(
-                    token_backend=token_backend, drive=drive, proxies=proxies
-                )
+                    token_backend = FileSystemTokenBackend(cred=cred, token_path=p)
+
+                client = GoogleDrive(token_backend=token_backend, drive=drive)
                 clients.append(client)
+
             random.shuffle(clients)
             return cls(path=path, clients=clients, root=root)
         else:
             raise Exception("Token path not exists")
 
     def iter_tasks(self):
-        pass
+        client = self._get_client()
+        for file_id, relative_path in self._list_dirs(self.path):
+            yield GoogleDriveTransferDownloadTask(file_id, relative_path, client)
 
     def get_worker(self, task):
 
@@ -359,7 +479,7 @@ class GoogleDriveTransferManager:
             dir_id = self._get_dir_id(client, dir_path)
 
             def worker(bar):
-                w = GoogleDriveTransferUploadTask(task, bar, client,)
+                w = GoogleDriveTransferUploadTask(task, bar, client)
                 w.run(dir_id, name)
 
             return worker

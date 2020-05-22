@@ -3,9 +3,10 @@
     "gd": { "mod": "googledrive", "cls": "GoogleDriveTransferManager" },
     "od": { "mod": "onedrive", "cls": "OneDriveTransferManager" },
     "fs": { "mod": "filesystem", "cls": "FileSystemTransferManager" },
+    "http": { "mod": "httpdownload", "cls": "HttpTransferManager" },
     "odshare": {
       "mod": "onedriveshare",
-      "cls": " OneDriveShareTransferManager"
+      "cls": "OneDriveShareTransferManager"
     }
   },
   "bar": {
@@ -21,9 +22,11 @@
         "client_id": "client_id here",
         "client_secret": "client_secret here"
       },
-      "proxies": {
-        "http": "proxies here  # would support all proxies that requests support",
-        "https": "proxies here  # would support all proxies that requests support"
+      "http": {
+        "proxies": {
+          "http": "proxies here  # would support all proxies that requests support",
+          "https": "proxies here  # would support all proxies that requests support"
+        }
       },
       "root": "root",
       "drive_id": ""
@@ -32,9 +35,11 @@
       "service_account": true,
       "token_path": "/path/to/accounts/dir",
       "transfer": "gd",
-      "proxies": {
-        "http": "proxies here  # would support all proxies that requests support",
-        "https": "proxies here  # would support all proxies that requests support"
+      "http": {
+        "proxies": {
+          "http": "proxies here  # would support all proxies that requests support",
+          "https": "proxies here  # would support all proxies that requests support"
+        }
       },
       "root": "your root dirname here",
       "drive_id": "your team driveid here"
@@ -54,6 +59,15 @@
     },
     "fs": {
       "transfer": "fs"
+    },
+    "http": {
+      "transfer": "http",
+      "http": {
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36"
+        },
+        "verify": false
+      }
     },
     "odshare": {
       "is_folder": true,
