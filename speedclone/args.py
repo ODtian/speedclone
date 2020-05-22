@@ -57,8 +57,8 @@ def parse_args():
 
     parser.add_argument(
         "--copy",
-        default=True,
         action="store_true",
+        default=True,
         help="Copy file through drive, can only use with Google Drive.",
     )
 
