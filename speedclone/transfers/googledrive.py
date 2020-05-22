@@ -249,7 +249,7 @@ class GoogleDriveTransferDownloadTask:
     def get_total(self):
         with self.client.get_download_url(self.file_id) as r:
             self._info = r.json()
-            return self._info["size"]
+            return int(self._info["size"])
 
 
 class GoogleDriveTransferUploadTask:
