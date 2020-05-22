@@ -285,7 +285,8 @@ class GoogleDriveTransferUploadTask:
             self.bar.init_bar(file_size, self.task.get_relative_path())
             for file_id in self.task.iter_data(copy=True):
                 result = self.client.copy_to(file_id, folder_id, name)
-                self._handle_request_error(result)
+                if result is not False:
+                    self._handle_request_error(result)
 
         except TypeError:
             console_write(
