@@ -184,11 +184,23 @@ class GoogleDrive:
         )
         return r
 
-    def get_download_url(self, file_id):
-        params = {"fields": "size, webContentLink", "supportsAllDrives": "true"}
+    def get_file_size(self, file_id):
+        params = {"fields": "size", "supportsAllDrives": "true"}
         headers = self.get_headers()
         r = requests.get(
             self.drive_url + "/" + file_id, headers=headers, params=params, **self.http
+        )
+        return r
+
+    def get_download_request(self, file_id):
+        params = {"alt": "media", "supportsAllDrives": "true"}
+        headers = self.get_headers()
+        r = requests.get(
+            self.drive_url + "/" + file_id,
+            headers=headers,
+            params=params,
+            stream=True,
+            **self.http
         )
         return r
 
@@ -233,23 +245,21 @@ class GoogleDriveTransferDownloadTask:
         self.file_id = file_id
         self.relative_path = relative_path
         self.client = client
-        self._info = None
 
     def iter_data(self, chunk_size=(10 * 1024 ** 2), copy=False):
         if copy:
             yield self.file_id
         else:
-            download_url = self._info["webContentLink"]
-            with requests.get(download_url, stream=True, **self.http) as r:
+            with self.client.get_download_request(self.file_id) as r:
                 yield from r.iter_content(chunk_size=chunk_size)
 
     def get_relative_path(self):
         return self.relative_path
 
     def get_total(self):
-        with self.client.get_download_url(self.file_id) as r:
-            self._info = r.json()
-            return int(self._info["size"])
+        with self.client.get_file_size(self.file_id) as r:
+            size = int(r.json()["size"])
+            return size
 
 
 class GoogleDriveTransferUploadTask:
