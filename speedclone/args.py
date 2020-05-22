@@ -59,7 +59,6 @@ def parse_args():
         "--copy",
         default=True,
         action="store_true",
-        type=bool,
         help="Copy file through drive, can only use with Google Drive.",
     )
 
