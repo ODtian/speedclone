@@ -279,8 +279,10 @@ class GoogleDriveTransferUploadTask:
             raise TaskFailError(
                 task=self.task, msg="Client is sleeping, will retry later."
             )
-        file_size = self.task.get_total()
+
         try:
+            file_size = self.task.get_total()
+            self.bar.init_bar(file_size, self.task.get_relative_path())
             for file_id in self.task.iter_data(copy=True):
                 result = self.client.copy_to(file_id, folder_id, name)
                 self._handle_request_error(result)
