@@ -1,6 +1,8 @@
 import time
-from concurrent.futures import ThreadPoolExecutor
-from multiprocessing import JoinableQueue
+from concurrent.futures import ThreadPoolExecutor, CancelledError
+
+# from multiprocessing import JoinableQueue
+from queue import Queue
 from queue import Empty
 from threading import Thread
 
@@ -19,8 +21,9 @@ class TransferManager:
         self.pusher_thread = None
         self.pusher_finished = False
 
-        self.task_queue = JoinableQueue()
-        self.sleep_queue = JoinableQueue()
+        self.task_queue = Queue()
+        self.taskdone_queue = Queue()
+        self.sleep_queue = Queue()
 
         self.futures = []
 
@@ -41,6 +44,9 @@ class TransferManager:
         self.task_queue.put(e.task)
         self.bar_manager.fail(e)
 
+    def handle_done(self, result):
+        self.bar_manager.done(result)
+
     def run_task_pusher(self):
         def pusher():
             for task in self.download_manager.iter_tasks():
@@ -48,13 +54,14 @@ class TransferManager:
                     return
                 else:
                     self.task_queue.put(task)
+                    self.taskdone_queue.put(0)
             self.pusher_finished = True
 
         self.pusher_thread = Thread(target=pusher)
         self.pusher_thread.start()
 
     def finished(self):
-        return self.task_queue._unfinished_tasks._semlock._is_zero()
+        return self.taskdone_queue.empty()
 
     def if_sleep(self):
         return not self.sleep_queue.empty()
@@ -65,8 +72,11 @@ class TransferManager:
         self.sleep_queue.task_done()
 
     def done_callback(self, task):
+        result = None
         try:
-            task.result()
+            result = task.result()
+        except CancelledError:
+            pass
         except TaskExistError as e:
             self.handle_exists(e)
         except TaskSleepError as e:
@@ -75,12 +85,14 @@ class TransferManager:
             self.handle_fail(e)
         except Exception as e:
             self.handle_error(e)
+        else:
+            self.handle_done(result)
         finally:
-            self.task_queue.task_done()
+            if not self.taskdone_queue.empty():
+                self.taskdone_queue.get()
 
     def clear_all_futueres(self):
-        for f in self.futures:
-            f.cancel()
+        [f.cancel() for f in self.futures]
 
     def get_task(self):
         try:
@@ -111,7 +123,9 @@ class TransferManager:
                 if not task:
                     continue
                 worker = self.get_worker(task)
-                executor.submit(worker).add_done_callback(self.done_callback)
+                future = executor.submit(worker)
+                future.add_done_callback(self.done_callback)
+                self.futures.append(future)
             time.sleep(self.sleep_time)
 
     def run(self, max_workers=None):
@@ -119,7 +133,18 @@ class TransferManager:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             try:
                 self.add_to_excutor(executor)
-            except (KeyboardInterrupt, SystemExit):
-                console_write("error", "Stopping pusher thread")
-                self.pusher_finished = True
+            except KeyboardInterrupt:
+                if not self.pusher_finished:
+                    console_write("error", "Stopping pusher thread.")
+                    self.pusher_finished = True
+                    console_write("error", "Waitting pusher thread.")
+                    self.pusher_thread.join()
+
+                console_write("error", "Waitting worker threads.")
                 self.clear_all_futueres()
+
+        console_write("error", "Clearing queues.")
+        self.sleep_queue.queue.clear()
+        self.task_queue.queue.clear()
+        self.taskdone_queue.queue.clear()
+        self.bar_manager.exit()

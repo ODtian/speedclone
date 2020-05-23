@@ -20,3 +20,9 @@ class BaseBarManager:
 
     def fail(self, e):
         console_write(mode="fail", message=e.msg)
+
+    def done(self, result):
+        pass
+
+    def exit(self):
+        pass

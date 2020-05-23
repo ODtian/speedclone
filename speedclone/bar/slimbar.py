@@ -19,6 +19,9 @@ class ByteBar:
     def close(self):
         pass
 
+    def close_bar(self):
+        self.bar.close()
+
     def _create_bar(self, total):
         bar = tqdm(
             total=total, position=1, unit="B", unit_scale=True, unit_divisor=1024
@@ -41,7 +44,10 @@ class CountBar:
         self.bar.update(n)
 
     def close(self):
-        self.update(1)
+        pass
+
+    def close_bar(self):
+        self.bar.close()
 
     def _create_bar(self, total):
         bar = tqdm(total=total, position=2, unit="tasks")
@@ -77,3 +83,10 @@ class SlimBarManager(BaseBarManager):
         super().fail(e)
         self.byte_bar.update(e.task.get_total())
         self.count_bar.update(1)
+
+    def done(self, result):
+        self.count_bar.update(1)
+
+    def exit(self):
+        self.byte_bar.close_bar()
+        self.count_bar.close_bar()
