@@ -321,6 +321,7 @@ class GoogleDriveTransferUploadTask:
                 raise TaskExistError(task=self.task)
 
         try:
+            print(upload_url_request.json())
             self._handle_request_error(upload_url_request)
 
             upload_url = upload_url_request.headers.get("Location")
