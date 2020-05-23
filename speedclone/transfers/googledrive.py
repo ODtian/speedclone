@@ -417,9 +417,9 @@ class GoogleDriveTransferManager:
         for i in is_file:
             yield i["id"], i["name"]
 
-    def _list_dirs(self, path, page_token=None):
+    def _list_dirs(self, path, page_token=None, client=None):
         try:
-            client = self._get_client()
+            client = client or self._get_client()
 
             dir_id = self._get_dir_id(client, path)
             p = {
@@ -448,7 +448,7 @@ class GoogleDriveTransferManager:
             next_token = result.get("nextPageToken")
 
             if next_token:
-                yield from self._list_dirs(path, next_token)
+                yield from self._list_dirs(path, next_token, client)
 
             for folder_path in folders:
                 yield from self._list_dirs(folder_path)
