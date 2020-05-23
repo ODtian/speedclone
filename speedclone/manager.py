@@ -147,4 +147,5 @@ class TransferManager:
         self.sleep_queue.queue.clear()
         self.task_queue.queue.clear()
         self.taskdone_queue.queue.clear()
+        console_write("error", "Closing bars.")
         self.bar_manager.exit()
