@@ -1,9 +1,6 @@
 import time
-from concurrent.futures import ThreadPoolExecutor, CancelledError
-
-# from multiprocessing import JoinableQueue
-from queue import Queue
-from queue import Empty
+from concurrent.futures import CancelledError, ThreadPoolExecutor
+from queue import Empty, Queue
 from threading import Thread
 
 from .error import TaskExistError, TaskFailError, TaskSleepError
