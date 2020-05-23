@@ -22,6 +22,17 @@ def main():
     f_conf = config.get(f_name)
     t_conf = config.get(t_name)
 
+    if not f_conf or not t_conf:
+        raise Exception(
+            "Could not find config named '{}'".format(
+                "' and '".join(
+                    filter(
+                        None, [("" if f_conf else f_name), ("" if t_conf else t_name)]
+                    )
+                )
+            )
+        )
+
     f_trans_name = f_conf.get("transfer")
     t_trans_name = t_conf.get("transfer")
 
@@ -32,7 +43,6 @@ def main():
 
     f_trans = transfers.get(f_trans_name)
     t_trans = transfers.get(t_trans_name)
-
     from_transfer = getattr(
         importlib.import_module(TRANSFERS_BASE_IMPORT_PATH + f_trans.get("mod")),
         f_trans.get("cls"),

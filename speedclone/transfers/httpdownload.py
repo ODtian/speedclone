@@ -42,9 +42,13 @@ class HttpTransferManager:
             yield self.path, unquote(os.path.basename(self.path))
         elif os.path.exists(self.path) and os.path.isfile(self.path):
             with open(self.path, "r") as f:
-                for url in f.readlines():
-                    resource_name = unquote(os.path.basename(url))
-                    yield url, resource_name
+                while True:
+                    url = f.readline().rstrip("\n")
+                    if url:
+                        resource_name = unquote(os.path.basename(url))
+                        yield url, resource_name
+                    else:
+                        return
         else:
             raise Exception("Source not illegal")
 
