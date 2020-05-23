@@ -130,22 +130,24 @@ class TransferManager:
 
     def run(self, max_workers=None):
         self.run_task_pusher()
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            try:
-                self.add_to_excutor(executor)
-            except KeyboardInterrupt:
-                if not self.pusher_finished:
-                    console_write("error", "Stopping pusher thread.")
-                    self.pusher_finished = True
-                    console_write("error", "Waitting pusher thread.")
-                    self.pusher_thread.join()
+        executor = ThreadPoolExecutor(max_workers=max_workers)
+        try:
+            self.add_to_excutor(executor)
+        except KeyboardInterrupt:
+            if not self.pusher_finished:
+                console_write("error", "Stopping pusher thread.")
+                self.pusher_finished = True
+                console_write("error", "Waitting pusher thread.")
+                self.pusher_thread.join()
 
-                console_write("error", "Waitting worker threads.")
-                self.clear_all_futueres()
+            console_write("error", "Waitting worker threads.")
+            self.clear_all_futueres()
+            executor.shutdown()
 
-        console_write("error", "Clearing queues.")
-        self.sleep_queue.queue.clear()
-        self.task_queue.queue.clear()
-        self.taskdone_queue.queue.clear()
-        console_write("error", "Closing bars.")
-        self.bar_manager.exit()
+            console_write("error", "Clearing queues.")
+            self.sleep_queue.queue.clear()
+            self.task_queue.queue.clear()
+            self.taskdone_queue.queue.clear()
+
+            console_write("error", "Closing bars.")
+            self.bar_manager.exit()
