@@ -415,7 +415,8 @@ class GoogleDriveTransferManager:
             )
 
             for i in is_file:
-                yield i["id"], norm_path(self.root_name, path, i["name"])
+                yield i["id"], i["name"]
+                return
 
             if page_token:
                 p = {"pageToken": page_token}
