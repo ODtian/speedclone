@@ -9,11 +9,9 @@ class HttpTransferDownloadTask:
     def __init__(self, url, relative_path):
         self.url = url
         self.relative_path = relative_path
-        self.r = None
+        self._r = None
 
     def iter_data(self, chunk_size=(10 * 1024 ** 2)):
-        if not self.r:
-            self.r = requests.get(self.url, stream=True, **self.http)
         try:
             self.r.raise_for_status()
             yield from self.r.iter_content(chunk_size=chunk_size)
@@ -24,15 +22,20 @@ class HttpTransferDownloadTask:
         return self.relative_path
 
     def get_total(self):
-        self.r = requests.get(self.url, stream=True, **self.http)
         try:
-            self.r.raise_for_status()
-            size = int(self.r.headers.get("Content-Length", 0))
-        except Exception as e:
+            if self.r.status_code == requests.codes.ok:
+                return int(self.r.headers.get("Content-Length", 1))
+            else:
+                return 1
+        except Exception:
             self.r.close()
-            raise e
-        else:
-            return size
+            return 1
+
+    @property
+    def r(self):
+        if not self._r:
+            self._r = requests.get(self.url, stream=True, **self.http)
+        return self._r
 
 
 class HttpTransferManager:
