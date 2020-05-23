@@ -1,4 +1,4 @@
-import functools
+# import functools
 import os
 import time
 
@@ -43,16 +43,16 @@ def iter_path(path):
                 yield os.path.join(root, filename)
 
 
-def with_lock(lock):
-    def _with_lock(func):
-        @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
-            with lock:
-                return func(self, *args, **kwargs)
+# def with_lock(lock):
+#     def _with_lock(func):
+#         @functools.wraps(func)
+#         def wrapper(self, *args, **kwargs):
+#             with lock:
+#                 return func(self, *args, **kwargs)
 
-        return wrapper
+#         return wrapper
 
-    return _with_lock
+#     return _with_lock
 
 
 def console_write(mode, message):

@@ -8,7 +8,7 @@ from urllib.parse import quote
 import requests
 
 from ..error import TaskExistError, TaskFailError
-from ..utils import DataIter, iter_path, norm_path, with_lock
+from ..utils import DataIter, iter_path, norm_path
 
 
 class FileSystemTokenBackend:
@@ -38,29 +38,26 @@ class FileSystemTokenBackend:
         else:
             return True
 
-    def _get_lock(self):
-        return self.lock
-
-    @with_lock(_get_lock())
     def _refresh_accesstoken(self):
-        now_time = int(time.time())
+        with self.lock:
+            now_time = int(time.time())
 
-        refresh_token = self.token.get("refresh_token")
-        scope = self.token.get("scope")
+            refresh_token = self.token.get("refresh_token")
+            scope = self.token.get("scope")
 
-        data = {
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-            "scope": scope,
-        }
-        data.update(self.client)
+            data = {
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "scope": scope,
+            }
+            data.update(self.client)
 
-        r = requests.post(self.token_url, data=data)
-        r.raise_for_status()
+            r = requests.post(self.token_url, data=data)
+            r.raise_for_status()
 
-        self.token = r.json()
-        self.token["get_time"] = now_time
-        self._update_tokenfile()
+            self.token = r.json()
+            self.token["get_time"] = now_time
+            self._update_tokenfile()
 
     def get_token(self):
         if self._token_expired():

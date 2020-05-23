@@ -8,8 +8,7 @@ import jwt
 import requests
 
 from ..error import TaskExistError, TaskFailError
-from ..utils import DataIter, iter_path, norm_path, with_lock, console_write
-
+from ..utils import DataIter, iter_path, norm_path, console_write
 
 
 class FileSystemTokenBackend:
@@ -39,23 +38,20 @@ class FileSystemTokenBackend:
         else:
             return True
 
-    def _get_lock(self):
-        return self.lock
-
-    @with_lock(_get_lock())
     def _refresh_accesstoken(self):
-        now_time = int(time.time())
-        refresh_token = self.token.get("refresh_token")
+        with self.lock:
+            now_time = int(time.time())
+            refresh_token = self.token.get("refresh_token")
 
-        data = {"refresh_token": refresh_token, "grant_type": "refresh_token"}
-        data.update(self.client)
+            data = {"refresh_token": refresh_token, "grant_type": "refresh_token"}
+            data.update(self.client)
 
-        r = requests.post(self.token_url, data=data, **self.http)
-        r.raise_for_status()
+            r = requests.post(self.token_url, data=data, **self.http)
+            r.raise_for_status()
 
-        self.token = r.json()
-        self.token["get_time"] = now_time
-        self._update_tokenfile()
+            self.token = r.json()
+            self.token["get_time"] = now_time
+            self._update_tokenfile()
 
     def get_token(self):
         if self._token_expired():
@@ -79,31 +75,30 @@ class FileSystemServiceAccountTokenBackend(FileSystemTokenBackend):
 
         self.lock = Lock()
 
-    def _get_lock(self):
-        return self.lock
-
-    @with_lock(_get_lock())
     def _refresh_accesstoken(self):
-        now_time = int(time.time())
-        token_data = {
-            "iss": self.config["client_email"],
-            "scope": self.scope,
-            "aud": self.token_url,
-            "exp": now_time + self.expires_in,
-            "iat": now_time,
-        }
+        with self.lock:
+            now_time = int(time.time())
+            token_data = {
+                "iss": self.config["client_email"],
+                "scope": self.scope,
+                "aud": self.token_url,
+                "exp": now_time + self.expires_in,
+                "iat": now_time,
+            }
 
-        auth_jwt = jwt.encode(
-            token_data, self.config["private_key"].encode("utf-8"), algorithm="RS256"
-        )
-        data = {
-            "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
-            "assertion": auth_jwt,
-        }
-        r = requests.post(self.token_url, data=data, **self.http)
-        r.raise_for_status()
-        self.token = r.json()
-        self.token["get_time"] = now_time
+            auth_jwt = jwt.encode(
+                token_data,
+                self.config["private_key"].encode("utf-8"),
+                algorithm="RS256",
+            )
+            data = {
+                "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                "assertion": auth_jwt,
+            }
+            r = requests.post(self.token_url, data=data, **self.http)
+            r.raise_for_status()
+            self.token = r.json()
+            self.token["get_time"] = now_time
 
 
 class GoogleDrive:
