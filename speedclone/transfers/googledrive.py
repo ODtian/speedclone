@@ -246,8 +246,11 @@ class GoogleDriveTransferDownloadTask:
         self.file_id = file_id
         self.relative_path = relative_path
         self.client = client
+        self._e = None
 
     def iter_data(self, chunk_size=(10 * 1024 ** 2), copy=False):
+        if self._e:
+            raise self._e
         if copy:
             yield self.file_id
         else:
@@ -259,9 +262,14 @@ class GoogleDriveTransferDownloadTask:
         return self.relative_path
 
     def get_total(self):
-        with self.client.get_file(self.file_id, fields="size") as r:
-            size = int(r.json()["size"])
-            return size
+        try:
+            with self.client.get_file(self.file_id, fields="size") as r:
+                r.raise_for_status()
+                size = int(r.json()["size"])
+                return size
+        except Exception as e:
+            self._e = e
+            return 1
 
 
 class GoogleDriveTransferUploadTask:
