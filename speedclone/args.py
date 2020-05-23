@@ -61,6 +61,13 @@ def parse_args():
         help="Copy file through drive, can only use with Google Drive.",
     )
 
+    parser.add_argument(
+        "--max-page-size",
+        default=100,
+        type=int,
+        help="Max size of single page when listing files.",
+    )
+
     args, rest = parser.parse_known_args()
 
     if os.path.exists(args.conf):

@@ -10,7 +10,6 @@ import requests
 from ..error import TaskExistError, TaskFailError
 from ..utils import DataIter, iter_path, norm_path, with_lock, console_write
 
-_google_token_write_lock = Lock()
 
 
 class FileSystemTokenBackend:
@@ -27,6 +26,8 @@ class FileSystemTokenBackend:
         else:
             raise Exception("No token file found.")
 
+        self.lock = Lock()
+
     def _update_tokenfile(self):
         with open(self.token_path, "w") as f:
             json.dump(self.token, f)
@@ -38,7 +39,10 @@ class FileSystemTokenBackend:
         else:
             return True
 
-    @with_lock(_google_token_write_lock)
+    def _get_lock(self):
+        return self.lock
+
+    @with_lock(_get_lock())
     def _refresh_accesstoken(self):
         now_time = int(time.time())
         refresh_token = self.token.get("refresh_token")
@@ -73,7 +77,12 @@ class FileSystemServiceAccountTokenBackend(FileSystemTokenBackend):
         else:
             raise Exception("No cred file found.")
 
-    @with_lock(_google_token_write_lock)
+        self.lock = Lock()
+
+    def _get_lock(self):
+        return self.lock
+
+    @with_lock(_get_lock())
     def _refresh_accesstoken(self):
         now_time = int(time.time())
         token_data = {
@@ -358,11 +367,13 @@ class GoogleDriveTransferUploadTask:
 
 
 class GoogleDriveTransferManager:
+    max_page_size = 100
+    _me = None
+
     def __init__(self, path, clients, root):
         self.path_dict = {"/": root}
         self.path = path
         self.clients = clients
-        self.is_file = False
 
     def _get_client(self):
         while True:
@@ -419,15 +430,16 @@ class GoogleDriveTransferManager:
         try:
             client = self._get_client()
 
+            dir_id = self._get_dir_id(client, path)
+            p = {
+                "q": " and ".join(
+                    ["'{parent_id}' in parents", "trashed = false"]
+                ).format(parent_id=dir_id),
+                "pageSize": self.max_page_size,
+            }
+
             if page_token:
-                p = {"pageToken": page_token}
-            else:
-                dir_id = self._get_dir_id(client, path)
-                p = {
-                    "q": " and ".join(
-                        ["'{parent_id}' in parents", "trashed = false"]
-                    ).format(parent_id=dir_id)
-                }
+                p.update({"pageToken": page_token})
 
             r = client.get_files_by_p(p)
             result = r.json()
@@ -456,40 +468,49 @@ class GoogleDriveTransferManager:
 
     @classmethod
     def get_transfer(cls, conf, path, args):
-
-        GoogleDriveTransferUploadTask.chunk_size = args.chunk_size
-        GoogleDriveTransferUploadTask.step_size = args.step_size
-        GoogleDrive.sleep_time = args.client_sleep
-
-        if args.copy:
-            GoogleDriveTransferUploadTask.run = GoogleDriveTransferUploadTask._do_copy
-
-        GoogleDrive.http = conf.get("http", {})
-        FileSystemTokenBackend.http = conf.get("http", {})
-
-        token_path = conf.get("token_path")
-
-        if os.path.exists(token_path):
-            use_service_account = conf.get("service_account", False)
-
-            root = conf.get("root")
-            drive = conf.get("drive_id")
-            cred = conf.get("client")
-
-            clients = []
-
-            for p in iter_path(token_path):
-                if use_service_account:
-                    token_backend = FileSystemServiceAccountTokenBackend(cred_path=p)
-                else:
-                    token_backend = FileSystemTokenBackend(cred=cred, token_path=p)
-                client = GoogleDrive(token_backend=token_backend, drive=drive)
-                clients.append(client)
-
-            random.shuffle(clients)
-            return cls(path=path, clients=clients, root=root)
+        if cls._me is not None:
+            return cls._me
         else:
-            raise Exception("Token path not exists")
+            GoogleDriveTransferUploadTask.chunk_size = args.chunk_size
+            GoogleDriveTransferUploadTask.step_size = args.step_size
+            GoogleDrive.sleep_time = args.client_sleep
+            cls.max_page_size = args.max_page_size
+
+            if args.copy:
+                GoogleDriveTransferUploadTask.run = (
+                    GoogleDriveTransferUploadTask._do_copy
+                )
+
+            GoogleDrive.http = conf.get("http", {})
+            FileSystemTokenBackend.http = conf.get("http", {})
+
+            token_path = conf.get("token_path")
+
+            if os.path.exists(token_path):
+                use_service_account = conf.get("service_account", False)
+
+                root = conf.get("root")
+                drive = conf.get("drive_id")
+                cred = conf.get("client")
+
+                clients = []
+
+                for p in iter_path(token_path):
+                    if use_service_account:
+                        token_backend = FileSystemServiceAccountTokenBackend(
+                            cred_path=p
+                        )
+                    else:
+                        token_backend = FileSystemTokenBackend(cred=cred, token_path=p)
+                    client = GoogleDrive(token_backend=token_backend, drive=drive)
+                    clients.append(client)
+
+                random.shuffle(clients)
+                me = cls(path=path, clients=clients, root=root)
+                cls._me = me
+                return me
+            else:
+                raise Exception("Token path not exists")
 
     def iter_tasks(self):
         for file_id, relative_path in self._list_files(self.path):
