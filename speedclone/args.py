@@ -71,18 +71,16 @@ def parse_args():
         bars = conf_json.get("bar")
 
         if not config:
-            print("Missing configs")
-            return
+            raise Exception("Missing configs")
 
         if not transfers:
-            print("Missing transfers")
-            return
+            raise Exception("Missing transfers")
 
         args_dict = vars(args)
 
         for k in config.keys():
             config[k].update(args_dict)
 
-        return args, rest[:2], config, transfers, bars
+        return args, rest, config, transfers, bars
     else:
-        print("Config file does not exist.")
+        raise Exception("Config file does not exist.")

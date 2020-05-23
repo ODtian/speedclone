@@ -184,8 +184,8 @@ class GoogleDrive:
         )
         return r
 
-    def get_file_size(self, file_id):
-        params = {"fields": "size", "supportsAllDrives": "true"}
+    def get_file(self, file_id, fields):
+        params = {"fields": fields, "supportsAllDrives": "true"}
         headers = self.get_headers()
         r = requests.get(
             self.drive_url + "/" + file_id, headers=headers, params=params, **self.http
@@ -257,7 +257,7 @@ class GoogleDriveTransferDownloadTask:
         return self.relative_path
 
     def get_total(self):
-        with self.client.get_file_size(self.file_id) as r:
+        with self.client.get_file(self.file_id, fields="size") as r:
             size = int(r.json()["size"])
             return size
 
@@ -297,13 +297,6 @@ class GoogleDriveTransferUploadTask:
                 result = self.client.copy_to(file_id, folder_id, name)
                 if result is not False:
                     self._handle_request_error(result)
-
-        except TypeError:
-            console_write(
-                mode="error",
-                message="Copy mode only support Google Drive, please check your config.",
-            )
-            result = None
         except Exception as e:
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
         else:
@@ -402,6 +395,12 @@ class GoogleDriveTransferManager:
                 self.path_dict[p] = folder_id
         return self.path_dict[p]
 
+    def _get_root_name(self):
+        client = self._get_client()
+        root_id = self.path_dict["/"]
+        r = client.get_file(root_id, "name")
+        return r.json()["name"]
+
     def _list_dirs(self, path, page_token=None):
         try:
             client = self._get_client()
@@ -426,7 +425,7 @@ class GoogleDriveTransferManager:
                     folders.append(relative_path)
                 else:
                     file_id = file["id"]
-                    yield file_id, relative_path
+                    yield file_id, norm_path(self.root_name, relative_path)
 
             next_token = result.get("nextPageToken")
 
@@ -469,7 +468,6 @@ class GoogleDriveTransferManager:
                     token_backend = FileSystemServiceAccountTokenBackend(cred_path=p)
                 else:
                     token_backend = FileSystemTokenBackend(cred=cred, token_path=p)
-
                 client = GoogleDrive(token_backend=token_backend, drive=drive)
                 clients.append(client)
 
@@ -479,8 +477,9 @@ class GoogleDriveTransferManager:
             raise Exception("Token path not exists")
 
     def iter_tasks(self):
-        client = self._get_client()
+        self.root_name = "" if self.path else self._get_root_name()
         for file_id, relative_path in self._list_dirs(self.path):
+            client = self._get_client()
             yield GoogleDriveTransferDownloadTask(file_id, relative_path, client)
 
     def get_worker(self, task):

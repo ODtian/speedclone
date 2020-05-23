@@ -15,15 +15,23 @@ def handle_rest(s):
 def main():
     args, rest, config, transfers, bars = parse_args()
 
-    f, t = rest
+    f, t = rest[0], rest[1]
     f_name, f_path = handle_rest(f)
     t_name, t_path = handle_rest(t)
 
     f_conf = config.get(f_name)
     t_conf = config.get(t_name)
 
-    f_trans = transfers.get(f_conf.get("transfer"))
-    t_trans = transfers.get(t_conf.get("transfer"))
+    f_trans_name = f_conf.get("transfer")
+    t_trans_name = t_conf.get("transfer")
+
+    if args.copy and (f_trans_name != "gd" or t_trans_name != "gd"):
+        raise Exception(
+            "Copy mode only support Google Drive, please check your config."
+        )
+
+    f_trans = transfers.get(f_trans_name)
+    t_trans = transfers.get(t_trans_name)
 
     from_transfer = getattr(
         importlib.import_module(TRANSFERS_BASE_IMPORT_PATH + f_trans.get("mod")),
