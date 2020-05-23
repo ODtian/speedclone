@@ -5,11 +5,6 @@ class TaskException(Exception):
         self.code = code
 
 
-class IterTaskException():
-    def __init__(self, msg):
-        self.msg = msg
-
-
 class TaskSleepError(TaskException):
     def __init__(
         self, sleep_time, **kwargs,

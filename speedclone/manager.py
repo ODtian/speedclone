@@ -4,8 +4,7 @@ from multiprocessing import JoinableQueue
 from queue import Empty
 from threading import Thread
 
-from .error import (IterTaskException, TaskExistError, TaskFailError,
-                    TaskSleepError)
+from .error import TaskExistError, TaskFailError, TaskSleepError
 from .utils import console_write
 
 
@@ -14,10 +13,16 @@ class TransferManager:
         self.download_manager = download_manager
         self.upload_manager = upload_manager
         self.bar_manager = bar_manager
+
         self.sleep_time = sleep_time
+
+        self.pusher_thread = None
         self.pusher_finished = False
+
         self.task_queue = JoinableQueue()
         self.sleep_queue = JoinableQueue()
+
+        self.futures = []
 
     def handle_sleep(self, e):
         self.task_queue.put(e.task)
@@ -39,14 +44,14 @@ class TransferManager:
     def run_task_pusher(self):
         def pusher():
             for task in self.download_manager.iter_tasks():
-                if isinstance(task, IterTaskException):
-                    console_write(mode="error", message=task.msg)
+                if self.pusher_finished:
+                    return
                 else:
                     self.task_queue.put(task)
             self.pusher_finished = True
 
-        pusher_thread = Thread(target=pusher)
-        pusher_thread.start()
+        self.pusher_thread = Thread(target=pusher)
+        self.pusher_thread.start()
 
     def finished(self):
         return self.task_queue._unfinished_tasks._semlock._is_zero()
@@ -73,6 +78,10 @@ class TransferManager:
         finally:
             self.task_queue.task_done()
 
+    def clear_all_futueres(self):
+        for f in self.futures:
+            f.cancel()
+
     def get_task(self):
         try:
             task = self.task_queue.get(timeout=self.sleep_time)
@@ -91,18 +100,26 @@ class TransferManager:
 
         return worker
 
+    def add_to_excutor(self, executor):
+        while True:
+            if self.finished() and self.pusher_finished:
+                break
+            elif self.if_sleep():
+                self.sleep()
+            else:
+                task = self.get_task()
+                if not task:
+                    continue
+                worker = self.get_worker(task)
+                executor.submit(worker).add_done_callback(self.done_callback)
+            time.sleep(self.sleep_time)
+
     def run(self, max_workers=None):
         self.run_task_pusher()
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            while True:
-                if self.finished() and self.pusher_finished:
-                    break
-                elif self.if_sleep():
-                    self.sleep()
-                else:
-                    task = self.get_task()
-                    if not task:
-                        continue
-                    worker = self.get_worker(task)
-                    executor.submit(worker).add_done_callback(self.done_callback)
-                time.sleep(self.sleep_time)
+            try:
+                self.add_to_excutor(executor)
+            except (KeyboardInterrupt, SystemExit):
+                console_write("error", "Stopping pusher thread")
+                self.pusher_finished = True
+                self.clear_all_futueres()
