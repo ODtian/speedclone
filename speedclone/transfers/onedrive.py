@@ -13,6 +13,7 @@ from ..utils import DataIter, iter_path, norm_path
 
 class FileSystemTokenBackend:
     token_url = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+    lock = Lock()
 
     def __init__(self, token_path, cred, tenant=None):
         self.token_path = token_path
@@ -24,8 +25,6 @@ class FileSystemTokenBackend:
                 self.token = json.load(f)
         else:
             raise Exception("No token file found.")
-
-        self.lock = Lock()
 
     def _update_tokenfile(self):
         with open(self.token_path, "w") as f:
@@ -185,8 +184,6 @@ class OneDriveTransferUploadTask:
 
 
 class OneDriveTransferManager:
-    _me = None
-
     def __init__(self, path, clients):
         self.path = path
         self.clients = clients
@@ -202,31 +199,26 @@ class OneDriveTransferManager:
 
     @classmethod
     def get_transfer(cls, conf, path, args):
-        if cls._me is not None:
-            return cls._me
+        OneDriveTransferUploadTask.chunk_size = args.chunk_size
+        OneDriveTransferUploadTask.step_size = args.step_size
+        OneDrive.sleep_time = args.client_sleep
+
+        token_path = conf.get("token_path")
+        if os.path.exists(token_path):
+            drive = conf.get("drive_id")
+            cred = conf.get("client")
+
+            clients = []
+
+            for p in iter_path(token_path):
+                token_backend = FileSystemTokenBackend(cred=cred, token_path=p)
+                client = OneDrive(token_backend=token_backend, drive=drive)
+                clients.append(client)
+
+            random.shuffle(clients)
+            return cls(path=path, clients=clients)
         else:
-            OneDriveTransferUploadTask.chunk_size = args.chunk_size
-            OneDriveTransferUploadTask.step_size = args.step_size
-            OneDrive.sleep_time = args.client_sleep
-
-            token_path = conf.get("token_path")
-            if os.path.exists(token_path):
-                drive = conf.get("drive_id")
-                cred = conf.get("client")
-
-                clients = []
-
-                for p in iter_path(token_path):
-                    token_backend = FileSystemTokenBackend(cred=cred, token_path=p)
-                    client = OneDrive(token_backend=token_backend, drive=drive)
-                    clients.append(client)
-
-                random.shuffle(clients)
-                me = cls(path=path, clients=clients)
-                cls._me = me
-                return me
-            else:
-                raise Exception("Token path not exists")
+            raise Exception("Token path not exists")
 
     def iter_tasks(self):
         pass

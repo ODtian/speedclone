@@ -14,6 +14,7 @@ from ..utils import DataIter, iter_path, norm_path, console_write
 class FileSystemTokenBackend:
     token_url = "https://oauth2.googleapis.com/token"
     http = {}
+    lock = Lock()
 
     def __init__(self, token_path, cred):
         self.token_path = token_path
@@ -24,8 +25,6 @@ class FileSystemTokenBackend:
                 self.token = json.load(f)
         else:
             raise Exception("No token file found.")
-
-        self.lock = Lock()
 
     def _update_tokenfile(self):
         with open(self.token_path, "w") as f:
@@ -72,8 +71,6 @@ class FileSystemServiceAccountTokenBackend(FileSystemTokenBackend):
                 self.config = json.load(f)
         else:
             raise Exception("No cred file found.")
-
-        self.lock = Lock()
 
     def _refresh_accesstoken(self):
         with self.lock:
@@ -363,7 +360,6 @@ class GoogleDriveTransferUploadTask:
 
 class GoogleDriveTransferManager:
     max_page_size = 100
-    _me = None
 
     def __init__(self, path, clients, root):
         self.path_dict = {"/": root}
@@ -463,49 +459,41 @@ class GoogleDriveTransferManager:
 
     @classmethod
     def get_transfer(cls, conf, path, args):
-        if cls._me is not None:
-            return cls._me
+
+        GoogleDriveTransferUploadTask.chunk_size = args.chunk_size
+        GoogleDriveTransferUploadTask.step_size = args.step_size
+        GoogleDrive.sleep_time = args.client_sleep
+        cls.max_page_size = args.max_page_size
+
+        if args.copy:
+            GoogleDriveTransferUploadTask.run = GoogleDriveTransferUploadTask._do_copy
+
+        GoogleDrive.http = conf.get("http", {})
+        FileSystemTokenBackend.http = conf.get("http", {})
+
+        token_path = conf.get("token_path")
+
+        if os.path.exists(token_path):
+            use_service_account = conf.get("service_account", False)
+
+            root = conf.get("root")
+            drive = conf.get("drive_id")
+            cred = conf.get("client")
+
+            clients = []
+
+            for p in iter_path(token_path):
+                if use_service_account:
+                    token_backend = FileSystemServiceAccountTokenBackend(cred_path=p)
+                else:
+                    token_backend = FileSystemTokenBackend(cred=cred, token_path=p)
+                client = GoogleDrive(token_backend=token_backend, drive=drive)
+                clients.append(client)
+
+            random.shuffle(clients)
+            return cls(path=path, clients=clients, root=root)
         else:
-            GoogleDriveTransferUploadTask.chunk_size = args.chunk_size
-            GoogleDriveTransferUploadTask.step_size = args.step_size
-            GoogleDrive.sleep_time = args.client_sleep
-            cls.max_page_size = args.max_page_size
-
-            if args.copy:
-                GoogleDriveTransferUploadTask.run = (
-                    GoogleDriveTransferUploadTask._do_copy
-                )
-
-            GoogleDrive.http = conf.get("http", {})
-            FileSystemTokenBackend.http = conf.get("http", {})
-
-            token_path = conf.get("token_path")
-
-            if os.path.exists(token_path):
-                use_service_account = conf.get("service_account", False)
-
-                root = conf.get("root")
-                drive = conf.get("drive_id")
-                cred = conf.get("client")
-
-                clients = []
-
-                for p in iter_path(token_path):
-                    if use_service_account:
-                        token_backend = FileSystemServiceAccountTokenBackend(
-                            cred_path=p
-                        )
-                    else:
-                        token_backend = FileSystemTokenBackend(cred=cred, token_path=p)
-                    client = GoogleDrive(token_backend=token_backend, drive=drive)
-                    clients.append(client)
-
-                random.shuffle(clients)
-                me = cls(path=path, clients=clients, root=root)
-                cls._me = me
-                return me
-            else:
-                raise Exception("Token path not exists")
+            raise Exception("Token path not exists")
 
     def iter_tasks(self):
         for file_id, relative_path in self._list_files(self.path):
