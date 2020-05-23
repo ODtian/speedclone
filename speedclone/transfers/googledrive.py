@@ -496,7 +496,7 @@ class GoogleDriveTransferManager:
             yield GoogleDriveTransferDownloadTask(
                 file_id, relative_path, self._get_client()
             )
-
+            return
         self.root_name = "" if self.path else self._get_root_name()
 
         for file_id, relative_path in self._list_dirs(self.path):
