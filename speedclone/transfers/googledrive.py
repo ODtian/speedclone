@@ -408,43 +408,45 @@ class GoogleDriveTransferManager:
             dir_path, name = os.path.split(path)
             parent_dir_id = self._get_dir_id(client, dir_path)
 
-            is_file = client.get_file_by_name(parent_dir_id, name, mime="file")
-            result = is_file.json().get("files", [])
+            is_file = (
+                client.get_files_by_name(parent_dir_id, name, mime="file")
+                .json()
+                .get("files", [])
+            )
 
-            if result:
-                for i in result:
-                    yield i["id"], norm_path(self.root_name, path, i["name"])
+            for i in is_file:
+                yield i["id"], norm_path(self.root_name, path, i["name"])
+
+            if page_token:
+                p = {"pageToken": page_token}
             else:
-                if page_token:
-                    p = {"pageToken": page_token}
+                dir_id = self._get_dir_id(client, path)
+                p = {
+                    "q": " and ".join(
+                        ["'{parent_id}' in parents", "trashed = false"]
+                    ).format(parent_id=dir_id)
+                }
+
+            r = client.get_files_by_p(p)
+            result = r.json()
+
+            folders = []
+
+            for file in result.get("files", []):
+                relative_path = norm_path(path, file["name"])
+                if file["mimeType"] == "application/vnd.google-apps.folder":
+                    folders.append(relative_path)
                 else:
-                    dir_id = self._get_dir_id(client, path)
-                    p = {
-                        "q": " and ".join(
-                            ["'{parent_id}' in parents", "trashed = false"]
-                        ).format(parent_id=dir_id)
-                    }
+                    file_id = file["id"]
+                    yield file_id, norm_path(self.root_name, relative_path)
 
-                r = client.get_files_by_p(p)
-                result = r.json()
+            next_token = result.get("nextPageToken")
 
-                folders = []
+            if next_token:
+                yield from self._list_dirs(path, next_token)
 
-                for file in result.get("files", []):
-                    relative_path = norm_path(path, file["name"])
-                    if file["mimeType"] == "application/vnd.google-apps.folder":
-                        folders.append(relative_path)
-                    else:
-                        file_id = file["id"]
-                        yield file_id, norm_path(self.root_name, relative_path)
-
-                next_token = result.get("nextPageToken")
-
-                if next_token:
-                    yield from self._list_dirs(path, next_token)
-
-                for folder_path in folders:
-                    yield from self._list_dirs(folder_path)
+            for folder_path in folders:
+                yield from self._list_dirs(folder_path)
 
         except Exception as e:
             console_write(mode="error", message="{}: {}".format(path, str(e)))
@@ -489,7 +491,6 @@ class GoogleDriveTransferManager:
 
     def iter_tasks(self):
         self.root_name = "" if self.path else self._get_root_name()
-
         for file_id, relative_path in self._list_dirs(self.path):
             client = self._get_client()
             yield GoogleDriveTransferDownloadTask(file_id, relative_path, client)
