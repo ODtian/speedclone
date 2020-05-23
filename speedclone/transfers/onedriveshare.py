@@ -16,6 +16,7 @@ class OneDriveShareTransferDownloadTask:
 
     def iter_data(self, chunk_size=(10 * 1024 ** 2)):
         with self.s.get(self.url, stream=True, **self.http) as r:
+            r.raise_for_status()
             yield from r.iter_content(chunk_size=chunk_size)
 
     def get_relative_path(self):

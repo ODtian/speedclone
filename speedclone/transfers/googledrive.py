@@ -251,6 +251,7 @@ class GoogleDriveTransferDownloadTask:
             yield self.file_id
         else:
             with self.client.get_download_request(self.file_id) as r:
+                r.raise_for_status()
                 yield from r.iter_content(chunk_size=chunk_size)
 
     def get_relative_path(self):
@@ -321,7 +322,6 @@ class GoogleDriveTransferUploadTask:
                 raise TaskExistError(task=self.task)
 
         try:
-            print(upload_url_request.json())
             self._handle_request_error(upload_url_request)
 
             upload_url = upload_url_request.headers.get("Location")

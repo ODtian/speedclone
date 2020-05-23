@@ -15,6 +15,7 @@ class HttpTransferDownloadTask:
         if not self.r:
             self.r = requests.get(self.url, stream=True, **self.http)
         try:
+            self.r.raise_for_status()
             yield from self.r.iter_content(chunk_size=chunk_size)
         finally:
             self.r.close()
@@ -25,6 +26,7 @@ class HttpTransferDownloadTask:
     def get_total(self):
         self.r = requests.get(self.url, stream=True, **self.http)
         try:
+            self.r.raise_for_status()
             size = int(self.r.headers.get("Content-Length", 0))
         except Exception as e:
             self.r.close()
