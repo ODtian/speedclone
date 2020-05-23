@@ -436,7 +436,7 @@ class GoogleDriveTransferManager:
                 yield from self._list_dirs(folder_path)
 
         except Exception as e:
-            console_write(mode="error", message="{}: {}".format(folder_path, str(e)))
+            console_write(mode="error", message="{}: {}".format(path, str(e)))
             yield from self._list_dirs(path)
 
     @classmethod
