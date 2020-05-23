@@ -362,6 +362,7 @@ class GoogleDriveTransferManager:
         self.path_dict = {"/": root}
         self.path = path
         self.clients = clients
+        self.is_file = False
 
     def _get_client(self):
         while True:
@@ -402,22 +403,21 @@ class GoogleDriveTransferManager:
         r = client.get_file(root_id, "name")
         return r.json()["name"]
 
+    def _list_files(self, path):
+        client = self._get_client()
+        dir_path, name = os.path.split(path)
+        parent_dir_id = self._get_dir_id(client, dir_path)
+        is_file = (
+            client.get_files_by_name(parent_dir_id, name, mime="file")
+            .json()
+            .get("files", [])
+        )
+        for i in is_file:
+            yield i["id"], i["name"]
+
     def _list_dirs(self, path, page_token=None):
         try:
             client = self._get_client()
-
-            dir_path, name = os.path.split(path)
-            parent_dir_id = self._get_dir_id(client, dir_path)
-
-            is_file = (
-                client.get_files_by_name(parent_dir_id, name, mime="file")
-                .json()
-                .get("files", [])
-            )
-
-            for i in is_file:
-                yield i["id"], i["name"]
-                return
 
             if page_token:
                 p = {"pageToken": page_token}
@@ -492,10 +492,17 @@ class GoogleDriveTransferManager:
             raise Exception("Token path not exists")
 
     def iter_tasks(self):
+        for file_id, relative_path in self._list_files(self.path):
+            yield GoogleDriveTransferDownloadTask(
+                file_id, relative_path, self._get_client()
+            )
+
         self.root_name = "" if self.path else self._get_root_name()
+
         for file_id, relative_path in self._list_dirs(self.path):
-            client = self._get_client()
-            yield GoogleDriveTransferDownloadTask(file_id, relative_path, client)
+            yield GoogleDriveTransferDownloadTask(
+                file_id, relative_path, self._get_client()
+            )
 
     def get_worker(self, task):
 
