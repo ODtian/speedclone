@@ -66,7 +66,8 @@ class TransferManager:
     def sleep(self):
         sleep_time = self.sleep_queue.get()
         time.sleep(sleep_time)
-        self.sleep_queue.task_done()
+        if not self.sleep_queue.empty():
+            self.sleep_queue.get()
 
     def done_callback(self, task):
         result = None
