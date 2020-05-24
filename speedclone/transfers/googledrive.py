@@ -462,7 +462,7 @@ class GoogleDriveTransferManager:
                 else:
                     file_id = file.get("id", "")
                     file_path = norm_path(self.root_name, relative_path)
-                    file_size = file.get("size", 0)
+                    file_size = int(file.get("size", 0))
                     yield file_id, file_path, file_size
 
             next_token = result.get("nextPageToken")
