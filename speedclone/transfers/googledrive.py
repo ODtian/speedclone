@@ -500,7 +500,7 @@ class GoogleDriveTransferManager:
 
             if conf.get("use_root_in_path"):
                 _path = path.split("/")
-                root = _path.pop()
+                root = _path.pop(0)
                 path = "/".join(_path)
 
             drive = conf.get("drive_id")
