@@ -44,6 +44,20 @@
       "root": "your root dirname here",
       "drive_id": "your team driveid here"
     },
+    "gdshare": {
+      "use_root_in_path": true,
+      "service_account": true,
+      "token_path": "/path/to/accounts/dir",
+      "transfer": "gd",
+      "http": {
+        "proxies": {
+          "http": "proxies here  # would support all proxies that requests support",
+          "https": "proxies here  # would support all proxies that requests support"
+        }
+      },
+      "root": "your root dirname here",
+      "drive_id": "your team driveid here"
+    },
     "od": {
       "token_path": "/path/to/token_file.json",
       "transfer": "od"

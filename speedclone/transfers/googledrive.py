@@ -148,7 +148,13 @@ class GoogleDrive:
         )
         return r
 
-    def get_files_by_name(self, parent_id, name=None, mime="folder"):
+    def get_files_by_name(
+        self,
+        parent_id,
+        name=None,
+        mime="folder",
+        fields=["files/id", "files/name", "files/mimeType"],
+    ):
         p = {
             "q": " and ".join(
                 [
@@ -161,14 +167,17 @@ class GoogleDrive:
                 parent_id=parent_id,
                 name=name.replace("'", r"\'"),
                 mime=("=" if mime == "folder" else "!="),
-            )
+            ),
+            "fields": ", ".join(fields),
         }
         r = self.get_files_by_p(p)
         return r
 
     def get_upload_url(self, parent_id, name):
         exist_file = (
-            self.get_files_by_name(parent_id, name, mime="file").json().get("files", [])
+            self.get_files_by_name(parent_id, name, mime="file", fields=["files/kind"])
+            .json()
+            .get("files", [])
         )
         if exist_file:
             return False
@@ -207,7 +216,9 @@ class GoogleDrive:
 
     def copy_to(self, source_id, dest_id, name):
         exist_file = (
-            self.get_files_by_name(dest_id, name, mime="file").json().get("files", [])
+            self.get_files_by_name(dest_id, name, mime="file", fields=["files/kind"])
+            .json()
+            .get("files", [])
         )
         if exist_file:
             return False
@@ -242,15 +253,13 @@ class GoogleDrive:
 class GoogleDriveTransferDownloadTask:
     http = {}
 
-    def __init__(self, file_id, relative_path, client):
+    def __init__(self, file_id, relative_path, size, client):
         self.file_id = file_id
         self.relative_path = relative_path
+        self.size = size
         self.client = client
-        self._e = None
 
     def iter_data(self, chunk_size=(10 * 1024 ** 2), copy=False):
-        if self._e:
-            raise self._e
         if copy:
             yield self.file_id
         else:
@@ -262,14 +271,7 @@ class GoogleDriveTransferDownloadTask:
         return self.relative_path
 
     def get_total(self):
-        try:
-            with self.client.get_file(self.file_id, fields="size") as r:
-                r.raise_for_status()
-                size = int(r.json()["size"])
-                return size
-        except Exception as e:
-            self._e = e
-            return 1
+        return self.size
 
 
 class GoogleDriveTransferUploadTask:
@@ -395,7 +397,9 @@ class GoogleDriveTransferManager:
                 dir_path, dir_name = os.path.split(p)
                 base_folder_id = self.path_dict[dir_path]
                 has_folder = (
-                    client.get_files_by_name(base_folder_id, dir_name)
+                    client.get_files_by_name(
+                        base_folder_id, dir_name, fields=["files/id"]
+                    )
                     .json()
                     .get("files")
                 )
@@ -418,12 +422,17 @@ class GoogleDriveTransferManager:
         dir_path, name = os.path.split(path)
         parent_dir_id = self._get_dir_id(client, dir_path)
         is_file = (
-            client.get_files_by_name(parent_dir_id, name, mime="file")
+            client.get_files_by_name(
+                parent_dir_id,
+                name,
+                mime="file",
+                fields=["files/id", "files/name", "files/mimeType", "files/size"],
+            )
             .json()
             .get("files", [])
         )
         for i in is_file:
-            yield i["id"], i["name"]
+            yield i.get("id", ""), i.get("name", ""), int(i.get("size", 0))
 
     def _list_dirs(self, path, page_token=None, client=None):
         try:
@@ -435,6 +444,7 @@ class GoogleDriveTransferManager:
                     ["'{parent_id}' in parents", "trashed = false"]
                 ).format(parent_id=dir_id),
                 "pageSize": self.max_page_size,
+                "fields": "files/id, files/name, files/size, files/mimeType",
             }
 
             if page_token:
@@ -446,12 +456,14 @@ class GoogleDriveTransferManager:
             folders = []
 
             for file in result.get("files", []):
-                relative_path = norm_path(path, file["name"])
+                relative_path = norm_path(path, file.get("name", ""))
                 if file["mimeType"] == "application/vnd.google-apps.folder":
                     folders.append(relative_path)
                 else:
-                    file_id = file["id"]
-                    yield file_id, norm_path(self.root_name, relative_path)
+                    file_id = file.get("id", "")
+                    file_path = norm_path(self.root_name, relative_path)
+                    file_size = file.get("size", 0)
+                    yield file_id, file_path, file_size
 
             next_token = result.get("nextPageToken")
 
@@ -485,6 +497,12 @@ class GoogleDriveTransferManager:
             use_service_account = conf.get("service_account", False)
 
             root = conf.get("root")
+
+            if conf.get("use_root_in_path"):
+                _path = path.split("/")
+                root = _path.pop()
+                path = "/".join(_path)
+
             drive = conf.get("drive_id")
             cred = conf.get("client")
 
@@ -504,16 +522,16 @@ class GoogleDriveTransferManager:
             raise Exception("Token path not exists")
 
     def iter_tasks(self):
-        for file_id, relative_path in self._list_files(self.path):
+        for file_id, relative_path, size in self._list_files(self.path):
             yield GoogleDriveTransferDownloadTask(
-                file_id, relative_path, self._get_client()
+                file_id, relative_path, size, self._get_client()
             )
             return
         self.root_name = "" if self.path else self._get_root_name()
 
-        for file_id, relative_path in self._list_dirs(self.path):
+        for file_id, relative_path, size in self._list_dirs(self.path):
             yield GoogleDriveTransferDownloadTask(
-                file_id, relative_path, self._get_client()
+                file_id, relative_path, size, self._get_client()
             )
 
     def get_worker(self, task):

@@ -24,11 +24,11 @@ class HttpTransferDownloadTask:
     def get_total(self):
         try:
             if self.r.status_code == requests.codes.ok:
-                return int(self.r.headers.get("Content-Length", 1))
+                return int(self.r.headers.get("Content-Length", 0))
         except Exception:
             pass
         finally:
-            return 1
+            return 0
 
     @property
     def r(self):
