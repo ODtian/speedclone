@@ -55,8 +55,7 @@
           "https": "proxies here  # would support all proxies that requests support"
         }
       },
-      "root": "your root dirname here",
-      "drive_id": "your team driveid here"
+      "drive_id": ""
     },
     "od": {
       "token_path": "/path/to/token_file.json",
