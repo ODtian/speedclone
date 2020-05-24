@@ -153,7 +153,7 @@ class GoogleDrive:
         parent_id,
         name=None,
         mime="folder",
-        fields=["files/id", "files/name", "files/mimeType"],
+        fields=("files/id", "files/name", "files/mimeType"),
     ):
         p = {
             "q": " and ".join(
@@ -175,7 +175,7 @@ class GoogleDrive:
 
     def get_upload_url(self, parent_id, name):
         exist_file = (
-            self.get_files_by_name(parent_id, name, mime="file", fields=["files/kind"])
+            self.get_files_by_name(parent_id, name, mime="file", fields=("files/kind",))
             .json()
             .get("files", [])
         )
@@ -216,7 +216,7 @@ class GoogleDrive:
 
     def copy_to(self, source_id, dest_id, name):
         exist_file = (
-            self.get_files_by_name(dest_id, name, mime="file", fields=["files/kind"])
+            self.get_files_by_name(dest_id, name, mime="file", fields=("files/kind",))
             .json()
             .get("files", [])
         )
@@ -398,7 +398,7 @@ class GoogleDriveTransferManager:
                 base_folder_id = self.path_dict[dir_path]
                 has_folder = (
                     client.get_files_by_name(
-                        base_folder_id, dir_name, fields=["files/id"]
+                        base_folder_id, dir_name, fields=("files/id",)
                     )
                     .json()
                     .get("files")
@@ -426,7 +426,7 @@ class GoogleDriveTransferManager:
                 parent_dir_id,
                 name,
                 mime="file",
-                fields=["files/id", "files/name", "files/mimeType", "files/size"],
+                fields=("files/id", "files/name", "files/mimeType", "files/size"),
             )
             .json()
             .get("files", [])
@@ -444,7 +444,15 @@ class GoogleDriveTransferManager:
                     ["'{parent_id}' in parents", "trashed = false"]
                 ).format(parent_id=dir_id),
                 "pageSize": self.max_page_size,
-                "fields": "files/id, files/name, files/size, files/mimeType",
+                "fields": ", ".join(
+                    (
+                        "nextPageToken",
+                        "files/id",
+                        "files/name",
+                        "files/size",
+                        "files/mimeType",
+                    )
+                ),
             }
 
             if page_token:
