@@ -326,6 +326,7 @@ class GoogleDriveTransferUploadTask:
 
         try:
             upload_url_request = self.client.get_upload_url(forlder_id, name)
+            self._handle_request_error(upload_url_request)
         except Exception as e:
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
         else:
@@ -333,8 +334,6 @@ class GoogleDriveTransferUploadTask:
                 raise TaskExistError(task=self.task)
 
         try:
-            self._handle_request_error(upload_url_request)
-
             upload_url = upload_url_request.headers.get("Location")
             file_size = self.task.get_total()
 
@@ -361,7 +360,6 @@ class GoogleDriveTransferUploadTask:
                 if r.status_code not in (200, 201, 308):
                     self._handle_request_error(r)
                     raise Exception("Unknown Error: " + str(r))
-
         except Exception as e:
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
         finally:

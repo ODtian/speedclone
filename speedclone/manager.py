@@ -24,21 +24,25 @@ class TransferManager:
 
         self.futures = []
 
+    def put_task(self, task):
+        self.taskdone_queue.put(0)
+        self.task_queue.put(task)
+
     def handle_sleep(self, e):
-        self.task_queue.put(e.task)
+        self.put_task(e.task)
         if not self.sleep_queue.empty():
             self.sleep_queue.put(e.sleep_time)
         self.bar_manager.sleep(e)
 
     def handle_error(self, e):
-        self.task_queue.put(e.task)
+        self.put_task(e.task)
         self.bar_manager.error(e)
 
     def handle_exists(self, e):
         self.bar_manager.exists(e)
 
     def handle_fail(self, e):
-        self.task_queue.put(e.task)
+        self.put_task(e.task)
         self.bar_manager.fail(e)
 
     def handle_done(self, result):
@@ -50,8 +54,7 @@ class TransferManager:
                 if self.pusher_finished:
                     return
                 else:
-                    self.task_queue.put(task)
-                    self.taskdone_queue.put(0)
+                    self.put_task(task)
             self.pusher_finished = True
 
         self.pusher_thread = Thread(target=pusher)
