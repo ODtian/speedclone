@@ -346,10 +346,10 @@ class GoogleDriveTransferUploadTask:
                 start = i * self.chunk_size
 
                 data = DataIter(file_piece, self.step_size, self.bar)
+
+                data_range = "{}-{}".format(start, start + chunk_length - 1)
                 headers = {
-                    "Content-Range": "bytes {}-{}/{}".format(
-                        start, start + chunk_length - 1, file_size,
-                    ),
+                    "Content-Range": "bytes {}/{}".format(data_range, file_size),
                     "Content-Length": str(chunk_length),
                 }
 
@@ -360,6 +360,12 @@ class GoogleDriveTransferUploadTask:
                 if r.status_code not in (200, 201, 308):
                     self._handle_request_error(r)
                     raise Exception("Unknown Error: " + str(r))
+
+                if r.status_code == 308:
+                    header_range = r.headers.get("Range")
+                    if not header_range or header_range != data_range:
+                        raise Exception("Upload Error: Range missing")
+
         except Exception as e:
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
         finally:
