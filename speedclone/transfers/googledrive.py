@@ -376,12 +376,12 @@ class GoogleDriveTransferManager:
 
     def _get_client(self):
         while True:
-            _client = self.clients[0]
-            self.clients = self.clients[1:] + self.clients[:1]
-            if _client.sleeping:
+            client = self.clients.pop(0)
+            self.clients.append(client)
+            if client.sleeping:
                 continue
             else:
-                return _client
+                return client
 
     def _reduce_path(self, path):
         now = ""
@@ -401,11 +401,11 @@ class GoogleDriveTransferManager:
                     .json()
                     .get("files")
                 )
-                if not has_folder:
+                if has_folder:
+                    folder_id = has_folder[0].get("id")
+                else:
                     folder = client.create_file_by_name(base_folder_id, dir_name).json()
                     folder_id = folder.get("id")
-                else:
-                    folder_id = has_folder[0].get("id")
                 self.path_dict[p] = folder_id
         return self.path_dict[p]
 
@@ -533,6 +533,7 @@ class GoogleDriveTransferManager:
                 file_id, relative_path, size, self._get_client()
             )
             return
+
         self.root_name = "" if self.path else self._get_root_name()
 
         for file_id, relative_path, size in self._list_dirs(self.path):
