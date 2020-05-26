@@ -10,7 +10,9 @@ class CountTransferManager:
         pass
 
     def get_worker(self, task):
-        def worker():
-            pass
+        def worker(bar):
+            bar.init_bar()
+            bar.update(task.get_total())
+            bar.close()
 
         return worker
