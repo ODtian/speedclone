@@ -65,6 +65,7 @@ class FileSystemServiceAccountTokenBackend(FileSystemTokenBackend):
     def __init__(self, cred_path):
         self.cred_path = cred_path
         self.token = {}
+        self.lock = Lock()
 
         if os.path.exists(self.cred_path):
             with open(self.cred_path, "r") as f:
@@ -376,9 +377,9 @@ class GoogleDriveTransferManager:
     max_page_size = 100
 
     def __init__(self, path, clients, root):
-        self.path_dict = {"/": root}
         self.path = path
         self.clients = clients
+        self.path_dict = {"/": root}
 
     def _get_client(self):
         while True:
