@@ -11,8 +11,10 @@ class CountTransferManager:
 
     def get_worker(self, task):
         def worker(bar):
-            bar.init_bar()
-            bar.update(task.get_total())
+            file_size = task.get_total()
+            relative_path = task.get_relative_path()
+            bar.init_bar(file_size, relative_path)
+            bar.update(file_size)
             bar.close()
 
         return worker
