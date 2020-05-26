@@ -25,8 +25,12 @@ class TransferManager:
         self.futures = []
 
     def put_task(self, task):
-        self.taskdone_queue.put(0)
+        self.taskdone_queue.put(None)
         self.task_queue.put(task)
+
+    def task_done(self):
+        if not self.taskdone_queue.empty():
+            self.taskdone_queue.get()
 
     def handle_sleep(self, e):
         self.put_task(e.task)
@@ -89,8 +93,7 @@ class TransferManager:
         else:
             self.handle_done(result)
         finally:
-            if not self.taskdone_queue.empty():
-                self.taskdone_queue.get()
+            self.task_done()
 
     def clear_all_futueres(self):
         [f.cancel() for f in self.futures]
