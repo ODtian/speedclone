@@ -4,6 +4,7 @@
     "od": { "mod": "onedrive", "cls": "OneDriveTransferManager" },
     "fs": { "mod": "filesystem", "cls": "FileSystemTransferManager" },
     "http": { "mod": "httpdownload", "cls": "HttpTransferManager" },
+    "count": { "mod": "count", "cls": "CountTransferManager" },
     "odshare": {
       "mod": "onedriveshare",
       "cls": "OneDriveShareTransferManager"
@@ -72,6 +73,9 @@
     },
     "fs": {
       "transfer": "fs"
+    },
+    "count": {
+      "transfer": "count"
     },
     "http": {
       "transfer": "http",
