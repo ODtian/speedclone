@@ -26,8 +26,6 @@ class HttpTransferDownloadTask:
             if self.r.status_code == requests.codes.ok:
                 return int(self.r.headers.get("Content-Length", 0))
         except Exception:
-            pass
-        finally:
             return 0
 
     @property

@@ -318,15 +318,14 @@ class GoogleDriveTransferUploadTask:
             self.bar.update(file_size)
             self.bar.close()
 
-    def run(self, forlder_id, name):
+    def run(self, folder_id, name):
         if self.client.sleeping:
             raise TaskFailError(
                 task=self.task, msg="Client is sleeping, will retry later."
             )
 
         try:
-            upload_url_request = self.client.get_upload_url(forlder_id, name)
-            self._handle_request_error(upload_url_request)
+            upload_url_request = self.client.get_upload_url(folder_id, name)
         except Exception as e:
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
         else:
@@ -334,6 +333,7 @@ class GoogleDriveTransferUploadTask:
                 raise TaskExistError(task=self.task)
 
         try:
+            self._handle_request_error(upload_url_request)
             upload_url = upload_url_request.headers.get("Location")
             file_size = self.task.get_total()
 
@@ -363,7 +363,7 @@ class GoogleDriveTransferUploadTask:
 
                 if r.status_code == 308:
                     header_range = r.headers.get("Range")
-                    if not header_range or header_range != data_range:
+                    if not header_range or header_range.lstrip("bytes=") != data_range:
                         raise Exception("Upload Error: Range missing")
 
         except Exception as e:
