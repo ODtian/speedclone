@@ -357,7 +357,7 @@ class GoogleDriveTransferUploadTask:
                     upload_url, data=data, headers=headers, **self.client.http
                 )
 
-                if r.status_code not in (200, 201, 308):
+                if r.status_code not in (200, 308):
                     self._handle_request_error(r)
                     raise Exception("Unknown Error: " + str(r))
 
