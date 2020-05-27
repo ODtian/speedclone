@@ -3,8 +3,6 @@ from urllib.parse import parse_qs, unquote
 import requests
 
 from ..utils import console_write
-from threading import Thread
-from queue import Queue
 
 
 class OneDriveShareTransferDownloadTask:
@@ -51,7 +49,6 @@ class OneDriveShareTransferManager:
         self.path = path
         self.is_folder = is_folder
         self.s = requests.Session()
-        self.task_q = None
 
         split_url = self.path.lstrip("http://").lstrip("https://").split("/")
         tenant_name, account_name = split_url[0], split_url[4]
@@ -156,24 +153,8 @@ class OneDriveShareTransferManager:
         return cls(path=path, is_folder=is_folder)
 
     def iter_tasks(self):
-        self.task_q = Queue()
-
-        def pusher():
-            for url, name, size in self._iter_items(self.ref_path):
-                t = OneDriveShareTransferDownloadTask(url, name, size, self.s)
-                self.task_q.put(t)
-                self.task_q.put(None)
-
-        thread = Thread(target=pusher)
-        thread.setDaemon(True)
-        thread.start()
-
-        while True:
-            t = self.task_q.get()
-            if t is None:
-                break
-            else:
-                yield t
+        for url, name, size in self._iter_items(self.ref_path):
+            yield OneDriveShareTransferDownloadTask(url, name, size, self.s)
 
     def get_worker(self, task):
         pass

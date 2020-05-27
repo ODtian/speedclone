@@ -1,9 +1,8 @@
 import os
 import random
 
-from threading import Thread
 import requests
-from queue import Queue
+
 from ..client.google import (
     FileSystemServiceAccountTokenBackend,
     FileSystemTokenBackend,
@@ -142,7 +141,6 @@ class GoogleDriveTransferManager:
         self.path = path
         self.clients = clients
         self.path_dict = {"/": root}
-        self.task_q = None
 
     def _get_client(self):
         while True:
@@ -298,36 +296,18 @@ class GoogleDriveTransferManager:
             raise Exception("Token path not exists")
 
     def iter_tasks(self):
-        self.task_q = Queue()
+        for file_id, relative_path, size in self._list_files(self.path):
+            yield GoogleDriveTransferDownloadTask(
+                file_id, relative_path, size, self._get_client()
+            )
+            return
 
-        def pusher():
-            for file_id, relative_path, size in self._list_files(self.path):
-                t = GoogleDriveTransferDownloadTask(
-                    file_id, relative_path, size, self._get_client()
-                )
-                self.task_q.put(t)
-                self.task_q.put(None)
-                return
+        self.root_name = "" if self.path else self._get_root_name()
 
-            self.root_name = "" if self.path else self._get_root_name()
-
-            for file_id, relative_path, size in self._list_dirs(self.path):
-                t = GoogleDriveTransferDownloadTask(
-                    file_id, relative_path, size, self._get_client()
-                )
-                self.task_q.put(t)
-            self.task_q.put(None)
-
-        thread = Thread(target=pusher)
-        thread.setDaemon(True)
-        thread.start()
-
-        while True:
-            t = self.task_q.get()
-            if t is None:
-                break
-            else:
-                yield t
+        for file_id, relative_path, size in self._list_dirs(self.path):
+            yield GoogleDriveTransferDownloadTask(
+                file_id, relative_path, size, self._get_client()
+            )
 
     def get_worker(self, task):
 
