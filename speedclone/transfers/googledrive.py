@@ -123,6 +123,11 @@ class GoogleDriveTransferUploadTask:
                     self._handle_request_error(r)
                     raise Exception("Unknown Error: " + str(r))
 
+                if r.status_code == 308:
+                    header_range = r.headers.get("Range")
+                    if not header_range or header_range.lstrip("bytes=") != data_range:
+                        raise Exception("Upload Error: Range missing")
+
         except Exception as e:
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
         finally:
