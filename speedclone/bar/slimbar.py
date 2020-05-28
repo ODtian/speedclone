@@ -36,8 +36,8 @@ class SlimBarManager(BaseBarManager):
         self.bar.update_total(self.bar.count_bar, 1)
 
     def update(self, task):
-        self.bar.update(self.bar.byte_bar, task.get_total())
-        self.bar.update(self.bar.count_bar, 1)
+        self.bar.update(task.get_total())
+        self.bar.close()
 
     def get_bar(self, task):
         self.update_total(task)
