@@ -35,17 +35,13 @@ class CommonBar:
             bar_format=bar_format,
             unit="B",
             unit_scale=True,
-            unit_divisor=1024
+            unit_divisor=1024,
         )
         bar.set_description_str(self.content[: self.max_width])
         return bar
 
 
 class CommonBarManager(BaseBarManager):
-    def __init__(self, max_workers=5):
-        self.n = 0
-        self.max_workers = max_workers
-
     def get_bar(self, task):
         bar = CommonBar()
         return bar

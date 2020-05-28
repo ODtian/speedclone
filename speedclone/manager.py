@@ -49,9 +49,6 @@ class TransferManager:
         self.put_task(e.task)
         self.bar_manager.fail(e)
 
-    def handle_done(self, result):
-        self.bar_manager.done(result)
-
     def run_task_pusher(self):
         def pusher():
             for task in self.download_manager.iter_tasks():
@@ -77,9 +74,8 @@ class TransferManager:
             self.sleep_queue.get()
 
     def done_callback(self, task):
-        result = None
         try:
-            result = task.result()
+            task.result()
         except CancelledError:
             pass
         except TaskExistError as e:
@@ -90,8 +86,6 @@ class TransferManager:
             self.handle_fail(e)
         except Exception as e:
             self.handle_error(e)
-        else:
-            self.handle_done(result)
         finally:
             self.task_done()
 
