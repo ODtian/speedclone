@@ -1,13 +1,12 @@
 import os
 import random
+from json.decoder import JSONDecodeError
 
 import requests
+from requests.exceptions import HTTPError
 
-from ..client.google import (
-    FileSystemServiceAccountTokenBackend,
-    FileSystemTokenBackend,
-    GoogleDrive,
-)
+from ..client.google import (FileSystemServiceAccountTokenBackend,
+                             FileSystemTokenBackend, GoogleDrive)
 from ..error import TaskExistError, TaskFailError
 from ..utils import DataIter, console_write, iter_path, norm_path
 
@@ -55,8 +54,15 @@ class GoogleDriveTransferUploadTask:
         if request.status_code == 400 and "LimitExceeded" in request.text:
             seconds = self.client.sleep()
             raise Exception("Client Limit Exceeded. Sleep for {}s".format(seconds))
-
-        request.raise_for_status()
+        try:
+            request.raise_for_status()
+        except HTTPError as e:
+            status_code = e.response.status_code
+            try:
+                message = e.response.json().get("message")
+            except JSONDecodeError:
+                message = ""
+            raise Exception("HttpError {}: {}".format(status_code, message))
 
     def _do_copy(self, folder_id, name):
         if self.client.sleeping:
@@ -119,14 +125,15 @@ class GoogleDriveTransferUploadTask:
                     upload_url, data=data, headers=headers, **self.client.http
                 )
 
-                if r.status_code not in (200, 308):
-                    self._handle_request_error(r)
-                    raise Exception("Unknown Error: " + str(r))
+                self._handle_request_error(r)
 
                 if r.status_code == 308:
                     header_range = r.headers.get("Range")
                     if not header_range or header_range.lstrip("bytes=") != data_range:
                         raise Exception("Upload Error: Range missing")
+
+                elif "id" not in r.json().keys():
+                    raise Exception("Upload Error: Upload not successful")
 
         except Exception as e:
             raise TaskFailError(exce=e, task=self.task, msg=str(e))
