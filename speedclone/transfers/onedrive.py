@@ -1,11 +1,13 @@
 import os
 import random
+from json import JSONDecodeError
 
 import requests
+from requests.exceptions import HTTPError
 
+from ..client.microsoft import FileSystemTokenBackend, OneDrive
 from ..error import TaskExistError, TaskFailError
 from ..utils import DataIter, iter_path, norm_path
-from ..client.microsoft import FileSystemTokenBackend, OneDrive
 
 
 class OneDriveTransferDownloadTask:
@@ -28,7 +30,17 @@ class OneDriveTransferUploadTask:
             seconds = self.client.sleep(sleep_time)
             raise Exception("Client Limit Exceeded. Sleep for {}s".format(seconds))
 
-        request.raise_for_status()
+        try:
+            request.raise_for_status()
+        except HTTPError as e:
+            status_code = e.response.status_code
+            try:
+                message = (
+                    e.response.json().get("error", {}).get("message", "Empty message")
+                )
+            except JSONDecodeError:
+                message = ""
+            raise Exception("HttpError {}: {}".format(status_code, message))
 
     def run(self, remote_path):
         if self.client.sleeping:

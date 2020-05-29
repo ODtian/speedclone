@@ -54,12 +54,15 @@ class GoogleDriveTransferUploadTask:
         if request.status_code == 400 and "LimitExceeded" in request.text:
             seconds = self.client.sleep()
             raise Exception("Client Limit Exceeded. Sleep for {}s".format(seconds))
+
         try:
             request.raise_for_status()
         except HTTPError as e:
             status_code = e.response.status_code
             try:
-                message = e.response.json().get("message")
+                message = (
+                    e.response.json().get("error", {}).get("message", "Empty message")
+                )
             except JSONDecodeError:
                 message = ""
             raise Exception("HttpError {}: {}".format(status_code, message))
