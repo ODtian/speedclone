@@ -5,8 +5,11 @@ from json.decoder import JSONDecodeError
 import requests
 from requests.exceptions import HTTPError
 
-from ..client.google import (FileSystemServiceAccountTokenBackend,
-                             FileSystemTokenBackend, GoogleDrive)
+from ..client.google import (
+    FileSystemServiceAccountTokenBackend,
+    FileSystemTokenBackend,
+    GoogleDrive,
+)
 from ..error import TaskExistError, TaskFailError
 from ..utils import DataIter, console_write, iter_path, norm_path
 
@@ -114,15 +117,15 @@ class GoogleDriveTransferUploadTask:
                 self.task.iter_data(chunk_size=self.chunk_size)
             ):
                 chunk_length = len(file_piece)
+
                 start = i * self.chunk_size
-
-                data = DataIter(file_piece, self.step_size, self.bar)
-
-                data_range = "{}-{}".format(start, start + chunk_length - 1)
+                end = start + chunk_length - 1
                 headers = {
-                    "Content-Range": "bytes {}/{}".format(data_range, file_size),
+                    "Content-Range": "bytes {}-{}/{}".format(start, end, file_size),
                     "Content-Length": str(chunk_length),
                 }
+
+                data = DataIter(file_piece, self.step_size, self.bar)
 
                 r = requests.put(
                     upload_url, data=data, headers=headers, **self.client.http
@@ -132,7 +135,7 @@ class GoogleDriveTransferUploadTask:
 
                 if r.status_code == 308:
                     header_range = r.headers.get("Range")
-                    if not header_range or header_range.lstrip("bytes=") != data_range:
+                    if not header_range or header_range.lstrip("bytes=0-") != str(end):
                         raise Exception("Upload Error: Range missing")
 
                 elif "id" not in r.json().keys():
