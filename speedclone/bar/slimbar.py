@@ -47,16 +47,8 @@ class SlimBarManager(BaseBarManager):
         super().sleep(e)
         self.update(e.task)
 
-    def error(self, e):
-        super().error(e)
-        self.update(e.task)
-
     def exists(self, e):
         super().exists(e)
-        self.update(e.task)
-
-    def fail(self, e):
-        super().fail(e)
         self.update(e.task)
 
     def exit(self):
