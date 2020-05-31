@@ -6,9 +6,6 @@ class BaseBarManager:
     def get_bar_manager(cls, *args, **kwargs):
         return cls(*args, **kwargs)
 
-    def done(self):
-        pass
-
     def sleep(self, e):
         message = "{message} {sleep_time}".format(
             sleep_time=e.sleep_time, message=e.msg
