@@ -49,10 +49,10 @@ class FileSystemTransferUploadTask:
                         f.write(step)
                         data = data[self.step_size :]
                         self.bar.update(len(step))
-
-            self.bar.close()
         except Exception as e:
             raise TaskFailError(task=self.task, msg=str(e), code=type(e))
+        finally:
+            self.bar.close()
 
 
 class FileSystemTransferManager:
