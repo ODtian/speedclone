@@ -154,6 +154,7 @@ class GoogleDriveTransferManager:
         self.path = path
         self.clients = clients
         self.path_dict = {"/": root}
+        self.root_path, self.base_name = os.path.split(self.path)
 
     def _get_client(self):
         while True:
@@ -217,7 +218,9 @@ class GoogleDriveTransferManager:
         try:
             client = client or self._get_client()
 
-            dir_id = self._get_dir_id(client, path)
+            abs_path = norm_path(self.root_path, path)
+            dir_id = self._get_dir_id(client, abs_path)
+
             p = {
                 "q": " and ".join(
                     ["'{parent_id}' in parents", "trashed = false"]
@@ -317,7 +320,7 @@ class GoogleDriveTransferManager:
 
         self.root_name = "" if self.path else self._get_root_name()
 
-        for file_id, relative_path, size in self._list_dirs(self.path):
+        for file_id, relative_path, size in self._list_dirs(self.base_name):
             yield GoogleDriveTransferDownloadTask(
                 file_id, relative_path, size, self._get_client()
             )
