@@ -31,6 +31,7 @@ class TransferManager:
     def task_done(self):
         if not self.taskdone_queue.empty():
             self.taskdone_queue.get()
+        self.bar_manager.done()
 
     def handle_sleep(self, e):
         self.put_task(e.task)
