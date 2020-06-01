@@ -7,12 +7,18 @@
 │  │  ├─ basebar.py
 │  │  ├─ commonbar.py
 │  │  └─ slimbar.py
+│  ├─ client
+│  │  ├─ __init__.py
+│  │  ├─ google.py
+│  │  └─ microsoft.py
 │  ├─ transfers
 │  │  ├─ __init__.py
+│  │  ├─ count.py
 │  │  ├─ filesystem.py
 │  │  ├─ googledrive.py
+│  │  ├─ httpdownload.py
 │  │  ├─ onedrive.py
-│  │  └─ onedriveshared.py
+│  │  └─ onedriveshare.py
 │  ├─ __init__.py
 │  ├─ args.py
 │  ├─ error.py
@@ -27,31 +33,36 @@
 ```
 #### 基本命令：
 ```
-python main.py [source_config_name]:/path/to/your/file/or/dir [dest_config_name]:/path/to/your/dest/dir
+python main.py {source} {dest} [options]
 ```
-以上命令将把文件夹或文件`/path/to/your/file/or/dir`传输到远程目录`/path/to/your/dest/dir`。
+以上命令将把文件夹或文件传输到远程目录下。
 
-注：当`/path/to/your/file/or/dir`为文件夹时，这个文件夹会成为远程目录的子文件夹。
+其中`{source}`和`{dest}`为资源的表示形式，具体形式为`{配置名}:/{资源}`。
 
 #### 选项：
 ```
-usage: main.py [-h] [-I INTERVAL] [--client-sleep CLIENT_SLEEP] [-W WORKERS]
-               [-C CHUNK_SIZE] [-S STEP_SIZE] [-B BAR] [--conf CONF]
-
+usage: main.py [-h] [--interval INTERVAL] [--workers WORKERS] [--bar BAR]
+               [--chunk-size CHUNK_SIZE] [--max-page-size MAX_PAGE_SIZE]
 optional arguments:
   -h, --help            show this help message and exit
-  -I INTERVAL, --interval INTERVAL
-                        Interval time when putting workers into thread pool
-  -W WORKERS, --workers WORKERS
-                        The number of workers
-  -C CHUNK_SIZE, --chunk-size CHUNK_SIZE
-                        Size of single request in multiple chunk uploading
-  -S STEP_SIZE, --step-size STEP_SIZE
-                        Size of chunk when updating the progress bar
-  -B BAR, --bar BAR     Name of the progress bar
-  --client-sleep CLIENT_SLEEP
-                        Time to sleep when client has been throttled
-  --conf CONF           Path to the config file
+
+  --interval INTERVAL   Interval time when putting workers into thread pool.
+
+  --workers WORKERS     The number of workers.
+
+  --bar BAR             Name of the progress bar.
+
+  --copy                Copy file through drive, can only use with Google
+                        Drive.
+
+  --step-size STEP_SIZE
+                        Size of chunk when updating the progress bar.
+
+  --chunk-size CHUNK_SIZE
+                        Size of single request in multiple chunk uploading.
+
+  --max-page-size MAX_PAGE_SIZE
+                        Max size of single page when listing files.
 ```
 其中`--bar`选项目前可选项有`common`和`slim`，指的是进度条的样式，默认为`common`。
 ###### slim样式：
@@ -81,41 +92,44 @@ optional arguments:
 ```json
 {
   "transfers": {
-  	//
+
   },
   "bar": {
-  	//
+
   },
   "configs": {
-  	"config_name":{
-  	// config1
+  	"config_name_1":{
+
   	},
-  	"config_name":{
-  	// config2
+  	"config_name_2":{
+
   	}
 }
 ```
-将配置放到`"configs"`中，就可以在命令中使用了。
+将配置放到`configs`中，就可以在命令中使用了。
 ###### Google Drive：
-```json
+```
 {
-	"service_account": false, // 是否使用sa（service account），必选。
-	"token_path": "/path/to/token_file.json", // 你的凭证文件，如果 service_account 为是，则指定为下载下来的凭证文件路径，或文件夹；
+	"transfer": "gd", 
+	"use_root_in_path": bool
+	"service_account": bool, // 是否使用sa（service account），必选。
+	"token_path": string, // 你的凭证文件，如果 service_account 为是，则指定为下载下来的凭证文件路径，或文件夹；
 												  若否，则将验证后的json信息（详见下方）保存为文件，并指定为文件路径或文件夹。
-	"transfer": "gd", // 传输方式，此处为gd
 	"client": {       // oauth2凭证信息，如果 service_account 为是则不需要。
-	  "client_id": "client_id here",
-	  "client_secret": "client_secret here"
+	  "client_id": string,
+	  "client_secret": string
 	},
-	"proxies": {      // 代理，支持所有requests支持的代理方式
-	  "http": "",
-	  "https": ""
-	},
-	"root": "root",   // 根目录，为文件夹ID，root代表个人盘的根目录，可以为个人盘内的文件夹；
+	"http": object,
+	"root": string,   // 根目录，为文件夹ID，root代表个人盘的根目录，可以为个人盘内的文件夹；
 						 如果使用Team Drive，则为Team Drive的ID或盘内文件夹的ID。
-	"drive_id": ""    //盘ID，如果是个人盘无需指定，Team Drive需要指定为盘ID。
+	"drive_id": string    //盘ID，如果是个人盘无需指定，Team Drive需要指定为盘ID。
 }
 ```
+###### 资源表示形式:
+`{配置名}:/path/to/resource`
+
+`use_root_in_path`
+复制分享文件夹时可以使用，避免频繁更改配置中的`root`，为`true`时会取路径中第一个被斜线分割的字符串为`root`。
 个人账户json信息 (rclone配置文件的token)：
 ```
 {
