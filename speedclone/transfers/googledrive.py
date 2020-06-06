@@ -176,18 +176,19 @@ class GoogleDriveTransferManager:
             if self.path_dict.get(p) is None:
                 dir_path, dir_name = os.path.split(p)
                 base_folder_id = self.path_dict[dir_path]
-                has_folder = (
-                    client.get_files_by_name(
-                        base_folder_id, dir_name, fields=("files/id",)
-                    )
-                    .json()
-                    .get("files")
+
+                has_folder_r = client.get_files_by_name(
+                    base_folder_id, dir_name, fields=("files/id",)
                 )
+                has_folder_r.raise_for_status()
+
+                has_folder = has_folder_r.json().get("files")
                 if has_folder:
                     folder_id = has_folder[0].get("id")
                 else:
-                    folder = client.create_file_by_name(base_folder_id, dir_name).json()
-                    folder_id = folder.get("id")
+                    folder = client.create_file_by_name(base_folder_id, dir_name)
+                    folder.raise_for_status()
+                    folder_id = folder.json().get("id")
                 self.path_dict[p] = folder_id
         return self.path_dict[p]
 
