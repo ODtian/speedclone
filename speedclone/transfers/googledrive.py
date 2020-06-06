@@ -272,7 +272,7 @@ class GoogleDriveTransferManager:
 
         GoogleDriveTransferUploadTask.chunk_size = args.chunk_size
         GoogleDriveTransferUploadTask.step_size = args.step_size
-        GoogleDrive.sleep_time = args.client_sleep
+        GoogleDrive.sleep_time = args.sleep
         cls.max_page_size = args.max_page_size
 
         if args.copy:

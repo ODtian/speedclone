@@ -108,7 +108,7 @@ class OneDriveTransferManager:
     def get_transfer(cls, conf, path, args):
         OneDriveTransferUploadTask.chunk_size = args.chunk_size
         OneDriveTransferUploadTask.step_size = args.step_size
-        OneDrive.sleep_time = args.client_sleep
+        OneDrive.sleep_time = args.sleep
 
         token_path = conf.get("token_path")
         if os.path.exists(token_path):
