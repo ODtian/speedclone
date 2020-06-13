@@ -62,7 +62,7 @@ class TransferManager:
         self.pusher_thread.start()
 
     def finished(self):
-        return self.taskdone_queue.empty()
+        return self.taskdone_queue.empty() and self.pusher_finished
 
     def if_sleep(self):
         return not self.sleep_queue.empty()
@@ -112,7 +112,7 @@ class TransferManager:
 
     def add_to_excutor(self, executor):
         while True:
-            if self.finished() and self.pusher_finished:
+            if self.finished():
                 break
             elif self.if_sleep():
                 self.sleep()
