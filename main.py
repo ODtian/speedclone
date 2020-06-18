@@ -63,8 +63,9 @@ def main():
         upload_manager=to_transfer,
         bar_manager=bar_manager,
         sleep_time=args.interval,
+        max_workers=args.workers,
     )
-    transfer_manager.run(max_workers=args.workers)
+    transfer_manager.run()
 
 
 if __name__ == "__main__":

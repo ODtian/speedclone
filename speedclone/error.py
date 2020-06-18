@@ -19,6 +19,7 @@ class TaskFailError(TaskException):
     ):
         super().__init__(**kwargs)
         self.exce = exce
+        self.msg += "" if self.msg else str(type(self.exce))
 
 
 class TaskExistError(TaskException):

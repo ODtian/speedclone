@@ -8,12 +8,15 @@ from .utils import console_write
 
 
 class TransferManager:
-    def __init__(self, download_manager, upload_manager, bar_manager, sleep_time):
+    def __init__(
+        self, download_manager, upload_manager, bar_manager, sleep_time, max_workers
+    ):
         self.download_manager = download_manager
         self.upload_manager = upload_manager
         self.bar_manager = bar_manager
 
         self.sleep_time = sleep_time
+        self.max_workers = max_workers
 
         self.pusher_thread = None
         self.pusher_finished = False
@@ -21,6 +24,7 @@ class TransferManager:
         self.task_queue = Queue()
         self.taskdone_queue = Queue()
         self.sleep_queue = Queue()
+        self.sleep_taskdone_queue = Queue()
 
         self.futures = []
 
@@ -64,14 +68,13 @@ class TransferManager:
     def finished(self):
         return self.taskdone_queue.empty() and self.pusher_finished
 
-    def if_sleep(self):
-        return not self.sleep_queue.empty()
-
     def sleep(self):
-        sleep_time = self.sleep_queue.get()
-        time.sleep(sleep_time)
         if not self.sleep_queue.empty():
-            self.sleep_queue.get()
+            self.sleep_taskdone_queue.put(None)
+            sleep_time = self.sleep_queue.get()
+            time.sleep(sleep_time)
+            self.sleep_taskdone_queue.get()
+            self.sleep_taskdone_queue.task_done()
 
     def done_callback(self, task):
         try:
@@ -105,7 +108,7 @@ class TransferManager:
         bar = self.bar_manager.get_bar(task)
 
         def worker():
-            self.sleep_queue.join()
+            self.sleep_taskdone_queue.join()
             return _worker(bar)
 
         return worker
@@ -114,9 +117,8 @@ class TransferManager:
         while True:
             if self.finished():
                 break
-            elif self.if_sleep():
-                self.sleep()
             else:
+                self.sleep()
                 task = self.get_task()
                 if not task:
                     continue
@@ -126,9 +128,9 @@ class TransferManager:
                 self.futures.append(future)
             time.sleep(self.sleep_time)
 
-    def run(self, max_workers=None):
+    def run(self):
         self.run_task_pusher()
-        executor = ThreadPoolExecutor(max_workers=max_workers)
+        executor = ThreadPoolExecutor(max_workers=self.max_workers)
         try:
             self.add_to_excutor(executor)
         except KeyboardInterrupt:

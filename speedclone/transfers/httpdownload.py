@@ -12,11 +12,8 @@ class HttpTransferDownloadTask:
         self._r = None
 
     def iter_data(self, chunk_size=(10 * 1024 ** 2)):
-        try:
-            self.r.raise_for_status()
-            yield from self.r.iter_content(chunk_size=chunk_size)
-        finally:
-            self.r.close()
+        self.r.raise_for_status()
+        yield from self.r.iter_content(chunk_size=chunk_size)
 
     def get_relative_path(self):
         return self.relative_path
