@@ -153,7 +153,8 @@ class GoogleDriveTransferManager:
     def __init__(self, path, clients, root):
         self.path = path
         self.clients = clients
-        self.path_dict = {"/": root}
+        self.dir_cache = {"": root}
+        self.list_files_set = set()
         self.root_path, self.base_name = os.path.split(self.path)
 
     def _get_client(self):
@@ -165,47 +166,39 @@ class GoogleDriveTransferManager:
             else:
                 return client
 
-    def _reduce_path(self, path):
-        now = ""
-        for p in path.split("/"):
-            now += "/" + p
-            yield now
+    def _get_dir_id(self, path):
+        client = self._get_client()
 
-    def _get_dir_id(self, client, path):
-        for p in self._reduce_path(path):
-            if self.path_dict.get(p) is None:
-                dir_path, dir_name = os.path.split(p)
-                base_folder_id = self.path_dict[dir_path]
+        parent_path, name = os.path.split(path)
+        parent_id = self._get_cache_dir_id(parent_path)
 
-                has_folder = (
-                    client.get_files_by_name(
-                        base_folder_id, dir_name, fields=("files/id",)
-                    )
-                    .json()
-                    .get("files")
-                )
+        has_folder = (
+            client.get_files_by_name(parent_id, name, fields=("files/id",))
+            .json()
+            .get("files")
+        )
 
-                if has_folder:
-                    folder_id = has_folder[0].get("id")
-                else:
-                    folder_id = (
-                        client.create_file_by_name(base_folder_id, dir_name)
-                        .json()
-                        .get("id")
-                    )
-                self.path_dict[p] = folder_id
-        return self.path_dict[p]
+        if has_folder:
+            folder_id = has_folder[0].get("id")
+        else:
+            folder_id = client.create_file_by_name(parent_id, name).json().get("id")
+
+        self.dir_cache[path] = folder_id
+        return folder_id
+
+    def _get_cache_dir_id(self, path):
+        return self.dir_cache.get(path) or self._get_dir_id(path)
 
     def _get_root_name(self):
         client = self._get_client()
-        root_id = self.path_dict["/"]
+        root_id = self.path_dict[""]
         r = client.get_file(root_id, "name")
         return r.json()["name"]
 
     def _list_files(self, path):
         client = self._get_client()
         dir_path, name = os.path.split(path)
-        parent_dir_id = self._get_dir_id(client, dir_path)
+        parent_dir_id = self._get_cache_dir_id(dir_path)
         is_file = (
             client.get_files_by_name(
                 parent_dir_id,
@@ -224,7 +217,7 @@ class GoogleDriveTransferManager:
             client = client or self._get_client()
 
             abs_path = norm_path(self.root_path, path)
-            dir_id = self._get_dir_id(client, abs_path)
+            dir_id = self._get_cache_dir_id(abs_path)
 
             p = {
                 "q": " and ".join(
@@ -258,7 +251,11 @@ class GoogleDriveTransferManager:
                     file_id = file.get("id", "")
                     file_path = norm_path(self.root_name, relative_path)
                     file_size = int(file.get("size", 0))
-                    yield file_id, file_path, file_size
+
+                    result = (file_id, file_path, file_size)
+                    if result not in self.list_files_set:
+                        self.list_files_set.add(result)
+                        yield result
 
             next_token = result.get("nextPageToken")
 
@@ -336,7 +333,7 @@ class GoogleDriveTransferManager:
         dir_path, name = os.path.split(total_path)
         try:
             client = self._get_client()
-            dir_id = self._get_dir_id(client, dir_path)
+            dir_id = self._get_cache_dir_id(dir_path)
 
             def worker(bar):
                 w = GoogleDriveTransferUploadTask(task, bar, client)
