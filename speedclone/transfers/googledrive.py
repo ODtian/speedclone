@@ -252,10 +252,10 @@ class GoogleDriveTransferManager:
                     file_path = norm_path(self.root_name, relative_path)
                     file_size = int(file.get("size", 0))
 
-                    result = (file_id, file_path, file_size)
-                    if result not in self.list_files_set:
-                        self.list_files_set.add(result)
-                        yield result
+                    item = (file_id, file_path, file_size)
+                    if item not in self.list_files_set:
+                        self.list_files_set.add(item)
+                        yield item
 
             next_token = result.get("nextPageToken")
 
