@@ -191,7 +191,7 @@ class GoogleDriveTransferManager:
 
     def _get_root_name(self):
         client = self._get_client()
-        root_id = self.path_dict[""]
+        root_id = self.dir_cache[""]
         r = client.get_file(root_id, "name")
         return r.json()["name"]
 
